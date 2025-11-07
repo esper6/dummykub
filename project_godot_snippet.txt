@@ -1,0 +1,12 @@
+; Add this to your project.godot file under the [autoload] section
+; Path: YourProject/project.godot
+
+[autoload]
+
+GameStateManager="*res://Scripts/GameState.gd"
+EventBus="*res://Scripts/EventBus.gd"
+
+; The asterisk (*) means the autoload is enabled
+; The order matters - GameStateManager should load before EventBus
+; since EventBus may reference GameStateManager
+

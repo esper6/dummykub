@@ -1,0 +1,92 @@
+[gd_scene load_steps=4 format=3 uid="uid://csgk5qd7oe8pb"]
+
+[ext_resource type="Script" path="res://Scripts/Player.gd" id="1_player"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_player"]
+size = Vector2(60, 160)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_weapon"]
+size = Vector2(80, 60)
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_player")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -80)
+shape = SubResource("RectangleShape2D_player")
+
+[node name="VisualRoot" type="Node2D" parent="."]
+
+[node name="Body" type="ColorRect" parent="VisualRoot"]
+offset_left = -30.0
+offset_top = -80.0
+offset_right = 30.0
+offset_bottom = 0.0
+color = Color(0.3, 0.5, 0.9, 1)
+
+[node name="Head" type="ColorRect" parent="VisualRoot"]
+offset_left = -25.0
+offset_top = -120.0
+offset_right = 25.0
+offset_bottom = -80.0
+color = Color(0.8, 0.7, 0.6, 1)
+
+[node name="Hat" type="Polygon2D" parent="VisualRoot"]
+color = Color(0.4, 0.2, 0.6, 1)
+polygon = PackedVector2Array(-35, -120, 35, -120, 25, -140, 0, -160, -25, -140)
+
+[node name="LeftArm" type="ColorRect" parent="VisualRoot"]
+offset_left = -50.0
+offset_top = -70.0
+offset_right = -30.0
+offset_bottom = -20.0
+color = Color(0.8, 0.7, 0.6, 1)
+
+[node name="RightArm" type="ColorRect" parent="VisualRoot"]
+offset_left = 30.0
+offset_top = -70.0
+offset_right = 50.0
+offset_bottom = -20.0
+color = Color(0.8, 0.7, 0.6, 1)
+
+[node name="LeftLeg" type="ColorRect" parent="VisualRoot"]
+offset_left = -25.0
+offset_right = -10.0
+offset_bottom = 20.0
+color = Color(0.2, 0.3, 0.5, 1)
+
+[node name="RightLeg" type="ColorRect" parent="VisualRoot"]
+offset_left = 10.0
+offset_right = 25.0
+offset_bottom = 20.0
+color = Color(0.2, 0.3, 0.5, 1)
+
+[node name="ComboTimer" type="Timer" parent="."]
+wait_time = 0.5
+one_shot = true
+
+[node name="HitstopTimer" type="Timer" parent="."]
+wait_time = 0.1
+one_shot = true
+
+[node name="WeaponHitbox" type="Area2D" parent="."]
+position = Vector2(70, -80)
+collision_layer = 2
+collision_mask = 4
+monitoring = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WeaponHitbox"]
+shape = SubResource("RectangleShape2D_weapon")
+
+[node name="WeaponVisual" type="ColorRect" parent="WeaponHitbox"]
+visible = false
+offset_left = -40.0
+offset_top = -30.0
+offset_right = 40.0
+offset_bottom = 30.0
+color = Color(1, 0.8, 0.2, 0.7)
+
+[connection signal="timeout" from="ComboTimer" to="." method="_on_combo_timer_timeout"]
+[connection signal="timeout" from="HitstopTimer" to="." method="_on_hitstop_timer_timeout"]
+[connection signal="area_entered" from="WeaponHitbox" to="." method="_on_weapon_hitbox_area_entered"]
+

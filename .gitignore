@@ -1,0 +1,87 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# Godot-specific
+*.translation
+*.import
+export_presets.cfg
+export.cfg
+.mono/
+data_*/
+mono_crash.*.json
+
+# Build artifacts
+builds/
+build/
+dist/
+*.exe
+*.pck
+*.dmg
+*.zip
+*.apk
+*.aab
+
+# Logs
+*.log
+logs/
+
+# OS-specific
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Editor-specific
+# VSCode / Cursor
+.vscode/
+.cursor/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~.nib
+*.autosave
+
+# User-specific Godot files
+# Keep these if you want settings to be shared across team
+# Uncomment to ignore them
+# override.cfg
+# .mono/
+# user://
+
+# Documentation (uncomment if you don't want to track generated docs)
+# docs/_build/
+# docs/html/
