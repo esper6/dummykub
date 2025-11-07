@@ -9,6 +9,7 @@ signal hit_landed(damage: int)
 @onready var hitstop_timer: Timer = $HitstopTimer
 @onready var weapon_hitbox: Area2D = $WeaponHitbox
 @onready var weapon_visual: ColorRect = $WeaponHitbox/WeaponVisual
+@onready var anim_sprite: AnimatedSprite2D = $VisualRoot/AnimatedSprite2D
 
 # Combo system
 enum ComboState { IDLE, PUNCH1, PUNCH2, KICK }
@@ -72,6 +73,13 @@ func _physics_process(delta: float) -> void:
 		# Move character
 		move_and_slide()
 	
+	# Animate sprite based on state
+	if not in_hitstop and game_active:
+		if velocity.x != 0 and is_on_floor():
+			anim_sprite.play("walk")
+		else:
+			anim_sprite.play("idle")
+	
 	# Animate attack offset back to neutral
 	if attack_offset != Vector2.ZERO:
 		attack_animation_time += delta * 10.0
@@ -127,6 +135,9 @@ func _attack_kick() -> void:
 	combo_timer.stop()
 
 func _do_attack(damage: int, offset: Vector2) -> void:
+	# Play attack animation
+	anim_sprite.play("attack")
+	
 	# Visual feedback
 	attack_offset = offset
 	visual_root.position = offset
@@ -187,4 +198,3 @@ func game_over() -> void:
 	game_active = false
 	can_input = false
 	weapon_hitbox.monitoring = false
-
