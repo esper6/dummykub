@@ -104,4 +104,3 @@ func _input(event: InputEvent) -> void:
 func _skip_intro() -> void:
 	can_skip = false
 	_finish_intro()
-

@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://d2ve5vym4axl8"]
 
-[ext_resource type="Script" path="res://Scripts/Dummy.gd" id="1_dummy"]
+[ext_resource type="Script" uid="uid://oksfirjfery5" path="res://Scripts/Dummy.gd" id="1_dummy"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hurtbox"]
 size = Vector2(100, 150)
@@ -17,8 +17,11 @@ position = Vector2(0, -75)
 shape = SubResource("RectangleShape2D_hurtbox")
 
 [node name="VisualRoot" type="Node2D" parent="."]
+y_sort_enabled = true
 
 [node name="Post" type="ColorRect" parent="VisualRoot"]
+z_index = -1
+z_as_relative = false
 offset_left = -15.0
 offset_top = -100.0
 offset_right = 15.0
@@ -26,20 +29,26 @@ offset_bottom = 20.0
 color = Color(0.4, 0.3, 0.2, 1)
 
 [node name="Head" type="ColorRect" parent="VisualRoot"]
+z_index = -1
+z_as_relative = false
 offset_left = -40.0
 offset_top = -150.0
 offset_right = 40.0
 offset_bottom = -100.0
-color = Color(0.7, 0.6, 0.5, 1)
+color = Color(0.7944975, 0.565081, 0.35601428, 1)
 
 [node name="Body" type="ColorRect" parent="VisualRoot"]
+z_index = -1
+z_as_relative = false
 offset_left = -50.0
 offset_top = -100.0
 offset_right = 50.0
 offset_bottom = -20.0
-color = Color(0.6, 0.5, 0.4, 1)
+color = Color(0.71253854, 0.45371842, 0.19971704, 1)
 
 [node name="LeftArm" type="ColorRect" parent="VisualRoot"]
+z_index = -1
+z_as_relative = false
 offset_left = -80.0
 offset_top = -90.0
 offset_right = -50.0
@@ -47,6 +56,7 @@ offset_bottom = -40.0
 color = Color(0.6, 0.5, 0.4, 1)
 
 [node name="RightArm" type="ColorRect" parent="VisualRoot"]
+z_as_relative = false
 offset_left = 50.0
 offset_top = -90.0
 offset_right = 80.0
@@ -54,6 +64,8 @@ offset_bottom = -40.0
 color = Color(0.6, 0.5, 0.4, 1)
 
 [node name="Base" type="Polygon2D" parent="VisualRoot"]
+z_index = -1
+z_as_relative = false
 color = Color(0.3, 0.2, 0.15, 1)
 polygon = PackedVector2Array(-60, 20, 60, 20, 40, 40, -40, 40)
 
@@ -62,4 +74,3 @@ wait_time = 0.1
 one_shot = true
 
 [connection signal="timeout" from="HitstopTimer" to="." method="_on_hitstop_timer_timeout"]
-

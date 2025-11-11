@@ -13,6 +13,9 @@ const HITSTOP_DURATION: float = 0.08
 const KNOCKBACK_STRENGTH: float = 30.0
 const RETURN_SPEED: float = 8.0
 
+# Damage number scene
+const DamageNumber = preload("res://Scenes/DamageNumber.tscn")
+
 func _ready() -> void:
 	base_position = visual_root.position
 
@@ -32,6 +35,9 @@ func _process(delta: float) -> void:
 		visual_root.position = base_position
 
 func take_damage(damage: int) -> void:
+	# Spawn floating damage number
+	_spawn_damage_number(damage)
+	
 	# Apply knockback
 	knockback_velocity = Vector2(KNOCKBACK_STRENGTH, 0)
 	
@@ -47,6 +53,26 @@ func take_damage(damage: int) -> void:
 	# Start hitstop
 	_start_hitstop()
 
+func _spawn_damage_number(damage: int) -> void:
+	var damage_num = DamageNumber.instantiate()
+	get_parent().add_child(damage_num)
+	
+	# Position above the dummy with some randomness
+	var spawn_offset = Vector2(randf_range(-30, 30), randf_range(-100, -50))
+	damage_num.global_position = global_position + spawn_offset
+	
+	# Put damage numbers on top of everything
+	damage_num.z_index = 100
+	
+	# Set color based on damage amount
+	var color = Color.WHITE
+	if damage >= 30:
+		color = Color.ORANGE_RED  # Big hits are red/orange
+	elif damage >= 20:
+		color = Color.YELLOW  # Medium hits are yellow
+	
+	damage_num.setup(damage, color)
+
 func _start_hitstop() -> void:
 	in_hitstop = true
 	hitstop_timer.wait_time = HITSTOP_DURATION
@@ -54,4 +80,3 @@ func _start_hitstop() -> void:
 
 func _on_hitstop_timer_timeout() -> void:
 	in_hitstop = false
-
