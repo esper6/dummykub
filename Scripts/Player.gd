@@ -3,6 +3,8 @@ extends CharacterBody2D
 ## Player wizard with punch-kick-uppercut combo system and platformer movement
 
 signal hit_landed(damage: int)
+signal attack_cooldown_started(duration: float)
+signal skill_cooldown_started(duration: float)
 
 @onready var visual_root: Node2D = $VisualRoot
 @onready var combo_timer: Timer = $ComboTimer
@@ -46,16 +48,43 @@ var hit_enemies_this_attack: Array = []
 # Pogo animation tracking
 var last_pogo_animation: String = ""
 var pogo_animations: Array[String] = ["pogo1", "pogo2", "pogo3"]
+var pogo_on_cooldown: bool = false  # Resets when player starts descending
+
+# Skill system
+const Thunderbolt = preload("res://Scenes/Thunderbolt.tscn")
+var current_skill: String = "thunderbolt"  # Can switch skills later
+var skill_cooldown: float = 0.0
+const SKILL_COOLDOWN_TIME: float = 1.0  # 1 second between casts
+
+# Attack cooldown system (triggers after 3-hit combo)
+var attack_cooldown: float = 0.0
+const ATTACK_COOLDOWN_TIME: float = 2.0  # 2 seconds cooldown after full combo
+var attack_on_cooldown: bool = false
 
 func _ready() -> void:
 	combo_timer.wait_time = COMBO_WINDOW
 	weapon_hitbox.monitoring = false
 	# Set initial weapon position based on facing direction
 	weapon_hitbox.position.x = 70 if facing_right else -70
+	# Hide weapon visual (keep hitbox functional)
+	weapon_visual.visible = false
 
 func _physics_process(delta: float) -> void:
 	if not game_active:
 		return
+	
+	# Update cooldowns
+	if skill_cooldown > 0:
+		skill_cooldown -= delta
+	
+	if attack_cooldown > 0:
+		attack_cooldown -= delta
+		if attack_cooldown <= 0:
+			attack_on_cooldown = false
+	
+	# Pogo cooldown resets when player starts descending
+	if pogo_on_cooldown and velocity.y > 0:  # Falling
+		pogo_on_cooldown = false
 	
 	if not in_hitstop:
 		# Apply gravity (reduced during pogo)
@@ -129,10 +158,16 @@ func _input(event: InputEvent) -> void:
 	
 	if event.is_action_pressed("attack") and can_input:
 		# Check for pogo attack (down + attack while in air)
-		if not is_on_floor() and Input.is_action_pressed("ui_down"):
+		# Pogo is independent of combo cooldown, but has its own physics-based cooldown
+		if not is_on_floor() and Input.is_action_pressed("ui_down") and not pogo_on_cooldown:
 			_attack_pogo()
-		else:
+		elif not attack_on_cooldown:
+			# Normal attacks require cooldown to be finished
 			_perform_attack()
+	
+	# Skill button (right-click)
+	if event.is_action_pressed("skill"):
+		_cast_skill()
 
 func _perform_attack() -> void:
 	can_input = false
@@ -153,25 +188,29 @@ func _perform_attack() -> void:
 func _attack_punch() -> void:
 	current_combo_state = ComboState.PUNCH
 	combo_count = 1
-	_do_attack(PUNCH_DAMAGE, Vector2(30, -10), "punch")
+	_do_attack(PUNCH_DAMAGE, Vector2(10, -5), "punch")
 	combo_timer.start()
 
 func _attack_kick() -> void:
 	current_combo_state = ComboState.KICK
 	combo_count = 2
-	_do_attack(KICK_DAMAGE, Vector2(50, 0), "kick")
+	_do_attack(KICK_DAMAGE, Vector2(15, 0), "kick")
 	combo_timer.start()
 
 func _attack_uppercut() -> void:
 	current_combo_state = ComboState.UPPERCUT
 	combo_count = 3
-	_do_attack(UPPERCUT_DAMAGE, Vector2(40, -20), "uppercut")
+	_do_attack(UPPERCUT_DAMAGE, Vector2(12, -8), "uppercut")
+	
+	# Trigger attack cooldown after finishing 3-hit combo
+	_start_attack_cooldown()
 	# After uppercut, combo resets
 	combo_timer.stop()
 
 func _attack_pogo() -> void:
 	is_pogo_attacking = true
 	current_combo_state = ComboState.POGO
+	pogo_on_cooldown = true  # Set cooldown (resets when falling again)
 	can_input = false
 	
 	# Choose random pogo animation (but never the same as last time)
@@ -188,7 +227,7 @@ func _attack_pogo() -> void:
 	
 	# Enable weapon hitbox
 	weapon_hitbox.monitoring = true
-	weapon_visual.visible = true
+	# weapon_visual stays hidden
 	
 	# Store original position to restore later
 	await get_tree().create_timer(0.3).timeout
@@ -196,7 +235,6 @@ func _attack_pogo() -> void:
 	# Only disable hitbox after timer, but keep pogo state active until landing
 	if is_pogo_attacking:
 		weapon_hitbox.monitoring = false
-		weapon_visual.visible = false
 		weapon_hitbox.position.x = stored_x
 		weapon_hitbox.position.y = -80
 		# Don't set is_pogo_attacking to false here - let landing handle it
@@ -206,7 +244,6 @@ func _end_pogo() -> void:
 	is_pogo_attacking = false
 	current_combo_state = ComboState.IDLE
 	weapon_hitbox.monitoring = false
-	weapon_visual.visible = false
 	# Restore weapon position
 	weapon_hitbox.position.x = 70 if facing_right else -70
 	weapon_hitbox.position.y = -80
@@ -229,12 +266,11 @@ func _do_attack(damage: int, offset: Vector2, animation_name: String) -> void:
 	
 	# Enable weapon hitbox
 	weapon_hitbox.monitoring = true
-	weapon_visual.visible = true
+	# weapon_visual stays hidden
 	
 	# Disable after a short time (attack duration)
 	await get_tree().create_timer(0.15).timeout
 	weapon_hitbox.monitoring = false
-	weapon_visual.visible = false
 	
 	# Re-enable input after attack completes (if not in hitstop from hitting something)
 	if not in_hitstop:
@@ -295,7 +331,86 @@ func _get_random_pogo_animation() -> String:
 	
 	return chosen
 
+func _cast_skill() -> void:
+	"""Cast the current skill. Scalable for multiple skills."""
+	# Check cooldown
+	if skill_cooldown > 0:
+		return  # Still on cooldown
+	
+	# Cast based on current skill
+	match current_skill:
+		"thunderbolt":
+			_cast_thunderbolt()
+		"fireball":
+			pass  # TODO: Add fireball later
+		"icebolt":
+			pass  # TODO: Add ice bolt later
+		_:
+			push_warning("Unknown skill: " + current_skill)
+
+func _cast_thunderbolt() -> void:
+	"""Cast a thunderbolt projectile."""
+	# Create projectile
+	var thunderbolt = Thunderbolt.instantiate()
+	get_parent().add_child(thunderbolt)
+	
+	# Position at player's location (slightly in front)
+	var offset = Vector2(40, -60) if facing_right else Vector2(-40, -60)
+	thunderbolt.global_position = global_position + offset
+	
+	# Set direction (towards mouse or facing direction)
+	var direction: Vector2
+	if get_viewport():
+		var mouse_pos = get_viewport().get_mouse_position()
+		var camera = get_viewport().get_camera_2d()
+		if camera:
+			# Convert screen space to world space
+			var world_mouse_pos = camera.get_screen_center_position() + (mouse_pos - get_viewport_rect().size / 2)
+			direction = (world_mouse_pos - global_position).normalized()
+		else:
+			direction = Vector2.RIGHT if facing_right else Vector2.LEFT
+	else:
+		direction = Vector2.RIGHT if facing_right else Vector2.LEFT
+	
+	# Setup the projectile
+	thunderbolt.setup(direction, 50)
+	
+	# Add screen shake for casting
+	_screen_shake(3.0, 0.1)
+	
+	# Start cooldown
+	skill_cooldown = SKILL_COOLDOWN_TIME
+	skill_cooldown_started.emit(SKILL_COOLDOWN_TIME)
+
+func _start_attack_cooldown() -> void:
+	"""Start the attack cooldown after full combo."""
+	attack_on_cooldown = true
+	attack_cooldown = ATTACK_COOLDOWN_TIME
+	attack_cooldown_started.emit(ATTACK_COOLDOWN_TIME)
+
+func _screen_shake(intensity: float, duration: float) -> void:
+	"""Create a screen shake effect."""
+	var camera = get_viewport().get_camera_2d()
+	if not camera:
+		return
+	
+	var original_offset = camera.offset
+	var shake_tween = create_tween()
+	
+	# Shake with random offsets
+	var shake_count = int(duration / 0.02)  # 50 FPS shake
+	for i in range(shake_count):
+		var random_offset = Vector2(
+			randf_range(-intensity, intensity),
+			randf_range(-intensity, intensity)
+		)
+		shake_tween.tween_property(camera, "offset", random_offset, 0.02)
+	
+	# Return to original position
+	shake_tween.tween_property(camera, "offset", original_offset, 0.05)
+
 func game_over() -> void:
 	game_active = false
 	can_input = false
 	weapon_hitbox.monitoring = false
+	weapon_visual.visible = false

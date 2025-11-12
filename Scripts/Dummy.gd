@@ -4,6 +4,7 @@ extends Node2D
 
 @onready var visual_root: Node2D = $VisualRoot
 @onready var hitstop_timer: Timer = $HitstopTimer
+@onready var dummy_sprite: AnimatedSprite2D = $Dummy
 
 var in_hitstop: bool = false
 var knockback_velocity: Vector2 = Vector2.ZERO
@@ -18,6 +19,12 @@ const DamageNumber = preload("res://Scenes/DamageNumber.tscn")
 
 func _ready() -> void:
 	base_position = visual_root.position
+	
+	# Show dummy and start with idle animation
+	if dummy_sprite:
+		dummy_sprite.visible = true
+		if dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("idle"):
+			dummy_sprite.play("idle")
 
 func _process(delta: float) -> void:
 	if in_hitstop:
@@ -34,9 +41,12 @@ func _process(delta: float) -> void:
 	else:
 		visual_root.position = base_position
 
-func take_damage(damage: int) -> void:
+func take_damage(damage: int, hit_animation: String = "hit_effect") -> void:
 	# Spawn floating damage number
 	_spawn_damage_number(damage)
+	
+	# Play hit effect animation
+	play_hit_effect(hit_animation)
 	
 	# Apply knockback
 	knockback_velocity = Vector2(KNOCKBACK_STRENGTH, 0)
@@ -77,6 +87,33 @@ func _start_hitstop() -> void:
 	in_hitstop = true
 	hitstop_timer.wait_time = HITSTOP_DURATION
 	hitstop_timer.start()
+
+func play_hit_effect(animation_name: String = "hit_effect") -> void:
+	"""Play a hit effect animation. Scalable for different attack types."""
+	if not dummy_sprite:
+		return  # No dummy sprite node, skip
+	
+	# Check if animation exists
+	if not dummy_sprite.sprite_frames:
+		return
+	
+	if not dummy_sprite.sprite_frames.has_animation(animation_name):
+		push_warning("Hit effect animation '" + animation_name + "' not found!")
+		return
+	
+	# Play the hit effect
+	dummy_sprite.play(animation_name)
+	
+	# Return to idle when effect finishes
+	if not dummy_sprite.animation_finished.is_connected(_on_hit_effect_finished):
+		dummy_sprite.animation_finished.connect(_on_hit_effect_finished)
+
+func _on_hit_effect_finished() -> void:
+	"""Return to idle animation after hit effect completes."""
+	if dummy_sprite and dummy_sprite.sprite_frames:
+		# Go back to idle animation
+		if dummy_sprite.sprite_frames.has_animation("idle"):
+			dummy_sprite.play("idle")
 
 func _on_hitstop_timer_timeout() -> void:
 	in_hitstop = false
