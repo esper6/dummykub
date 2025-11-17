@@ -1,0 +1,49 @@
+[gd_scene load_steps=3 format=3 uid="uid://djump_powerup_001"]
+
+[ext_resource type="Script" path="res://Scripts/DoubleJumpPowerup.gd" id="1_djump"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_powerup"]
+radius = 30.0
+
+[node name="DoubleJumpPowerup" type="Area2D"]
+collision_layer = 16
+collision_mask = 2
+script = ExtResource("1_djump")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_powerup")
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="OuterRing" type="Polygon2D" parent="Visual"]
+color = Color(0.3, 0.8, 1, 0.6)
+polygon = PackedVector2Array(-30, 0, -21.2, 21.2, 0, 30, 21.2, 21.2, 30, 0, 21.2, -21.2, 0, -30, -21.2, -21.2)
+
+[node name="InnerGlow" type="Polygon2D" parent="Visual"]
+color = Color(0.6, 0.9, 1, 0.9)
+polygon = PackedVector2Array(-20, 0, -14.1, 14.1, 0, 20, 14.1, 14.1, 20, 0, 14.1, -14.1, 0, -20, -14.1, -14.1)
+
+[node name="UpArrow1" type="Polygon2D" parent="Visual"]
+position = Vector2(0, -5)
+color = Color(1, 1, 1, 1)
+polygon = PackedVector2Array(-8, 5, 0, -5, 8, 5, 5, 5, 0, 0, -5, 5)
+
+[node name="UpArrow2" type="Polygon2D" parent="Visual"]
+position = Vector2(0, 5)
+color = Color(1, 1, 1, 0.7)
+polygon = PackedVector2Array(-8, 5, 0, -5, 8, 5, 5, 5, 0, 0, -5, 5)
+
+[node name="Label" type="Label" parent="Visual"]
+offset_left = -30.0
+offset_top = 35.0
+offset_right = 30.0
+offset_bottom = 55.0
+theme_override_colors/font_color = Color(0.6, 0.9, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 12
+text = "DOUBLE JUMP"
+horizontal_alignment = 1
+
+[connection signal="body_entered" from="." to="." method="_on_body_entered"]
+

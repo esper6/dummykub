@@ -5,10 +5,16 @@ extends Node2D
 @onready var visual_root: Node2D = $VisualRoot
 @onready var hitstop_timer: Timer = $HitstopTimer
 @onready var dummy_sprite: AnimatedSprite2D = $Dummy
+@onready var health_bar: ProgressBar = $HealthBar
 
 var in_hitstop: bool = false
 var knockback_velocity: Vector2 = Vector2.ZERO
 var base_position: Vector2 = Vector2.ZERO
+
+# Health system
+const MAX_HEALTH: int = 500
+var current_health: int = MAX_HEALTH
+var is_dead: bool = false
 
 const HITSTOP_DURATION: float = 0.08
 const KNOCKBACK_STRENGTH: float = 30.0
@@ -16,6 +22,7 @@ const RETURN_SPEED: float = 8.0
 
 # Damage number scene
 const DamageNumber = preload("res://Scenes/DamageNumber.tscn")
+const ImpactParticles = preload("res://Scenes/ImpactParticles.tscn")
 
 func _ready() -> void:
 	base_position = visual_root.position
@@ -41,15 +48,39 @@ func _process(delta: float) -> void:
 	else:
 		visual_root.position = base_position
 
-func take_damage(damage: int, hit_animation: String = "hit_effect") -> void:
-	# Spawn floating damage number
+func take_damage(damage: int, hit_from_position: Vector2 = Vector2.ZERO, hit_animation: String = "hit_effect", damage_type: String = "physical") -> void:
+	# Don't take damage if already dead
+	if is_dead:
+		return
+	
+	# Reduce health
+	current_health -= damage
+	print("Dummy HP: ", current_health, "/", MAX_HEALTH)
+	
+	# Update health bar
+	if health_bar:
+		health_bar.value = current_health
+	
+	# Spawn floating damage number (BEFORE death check so it shows on killing blows)
 	_spawn_damage_number(damage)
+	
+	# Check for death
+	if current_health <= 0:
+		current_health = 0
+		if health_bar:
+			health_bar.value = 0
+		_die(damage_type)
+		return
+	
+	# Spawn impact particles on opposite side
+	_spawn_impact_particles(hit_from_position)
 	
 	# Play hit effect animation
 	play_hit_effect(hit_animation)
 	
-	# Apply knockback
-	knockback_velocity = Vector2(KNOCKBACK_STRENGTH, 0)
+	# Apply knockback (direction based on hit position)
+	var knockback_dir = Vector2.RIGHT if hit_from_position.x < global_position.x else Vector2.LEFT
+	knockback_velocity = knockback_dir * KNOCKBACK_STRENGTH
 	
 	# Visual feedback - shake and scale
 	var tween = create_tween()
@@ -82,6 +113,24 @@ func _spawn_damage_number(damage: int) -> void:
 		color = Color.YELLOW  # Medium hits are yellow
 	
 	damage_num.setup(damage, color)
+
+func _spawn_impact_particles(hit_from_position: Vector2) -> void:
+	"""Spawn wood splinter particles on the opposite side of the hit."""
+	if hit_from_position == Vector2.ZERO:
+		return  # No position provided, skip particles
+	
+	var impact = ImpactParticles.instantiate()
+	get_parent().add_child(impact)
+	
+	# Calculate direction from hit source to dummy center
+	var hit_direction = (global_position - hit_from_position).normalized()
+	
+	# Spawn particles on the opposite side (exit side)
+	var spawn_offset = hit_direction * 60  # 60 pixels behind dummy
+	impact.global_position = global_position + spawn_offset
+	
+	# Particles fly in the hit direction
+	impact.setup(hit_direction, Color(0.6, 0.4, 0.2))  # Brown wood color
 
 func _start_hitstop() -> void:
 	in_hitstop = true
@@ -117,3 +166,119 @@ func _on_hit_effect_finished() -> void:
 
 func _on_hitstop_timer_timeout() -> void:
 	in_hitstop = false
+
+func _die(damage_type: String) -> void:
+	"""Handle dummy death with different animations based on damage type."""
+	is_dead = true
+	print("Dummy died from: ", damage_type)
+	
+	# Stop all movement/hitstop
+	knockback_velocity = Vector2.ZERO
+	in_hitstop = false
+	
+	# Grant EXP to player
+	_grant_exp_to_player()
+	
+	# Play appropriate death animation based on damage type
+	match damage_type:
+		"physical":
+			_play_death_animation_physical()
+		"fire":
+			_play_death_animation_fire()
+		"ice":
+			_play_death_animation_ice()
+		"lightning":
+			_play_death_animation_lightning()
+		_:
+			# Default to physical if unknown type
+			_play_death_animation_physical()
+
+func _grant_exp_to_player() -> void:
+	"""Grant EXP to the player when this dummy dies."""
+	const EXP_REWARD: int = 35
+	
+	# Find the player in the scene
+	var player = get_tree().get_first_node_in_group("player")
+	if not player:
+		# Try getting by name
+		player = get_parent().get_node_or_null("Player")
+	
+	if player and player.has_method("gain_exp"):
+		player.gain_exp(EXP_REWARD)
+		print("Granted ", EXP_REWARD, " EXP to player")
+	else:
+		print("Could not find player to grant EXP")
+
+func _play_death_animation_physical() -> void:
+	"""Death animation for physical attacks (punch, kick, uppercut)."""
+	print("Playing physical death animation")
+	
+	# Check if death animation exists in sprite frames
+	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_physical"):
+		dummy_sprite.play("death_physical")
+	else:
+		# Fallback: dramatic fall and fade
+		var death_tween = create_tween()
+		death_tween.set_parallel(true)
+		death_tween.tween_property(visual_root, "rotation", -PI/2, 0.5).set_ease(Tween.EASE_IN)
+		death_tween.tween_property(visual_root, "position:y", visual_root.position.y + 100, 0.5).set_ease(Tween.EASE_IN)
+		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.5)
+		death_tween.finished.connect(_on_death_animation_finished)
+
+func _play_death_animation_fire() -> void:
+	"""Death animation for fire attacks."""
+	print("Playing fire death animation")
+	
+	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_fire"):
+		dummy_sprite.play("death_fire")
+	else:
+		# Fallback: Burn up effect - flash red and disintegrate
+		var death_tween = create_tween()
+		death_tween.tween_property(visual_root, "modulate", Color.ORANGE_RED, 0.2)
+		death_tween.tween_property(visual_root, "modulate", Color.DARK_RED, 0.2)
+		death_tween.tween_property(visual_root, "scale", Vector2(1.2, 0.8), 0.3)
+		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.3)
+		death_tween.finished.connect(_on_death_animation_finished)
+
+func _play_death_animation_ice() -> void:
+	"""Death animation for ice attacks."""
+	print("Playing ice death animation")
+	
+	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_ice"):
+		dummy_sprite.play("death_ice")
+	else:
+		# Fallback: Freeze and shatter - turn blue/white then disappear
+		var death_tween = create_tween()
+		death_tween.tween_property(visual_root, "modulate", Color.CYAN, 0.3)
+		death_tween.tween_interval(0.2)
+		# Shatter effect - multiple quick scale pulses then fade
+		death_tween.tween_property(visual_root, "scale", Vector2(1.1, 1.1), 0.05)
+		death_tween.tween_property(visual_root, "scale", Vector2(0.9, 0.9), 0.05)
+		death_tween.tween_property(visual_root, "scale", Vector2(1.05, 1.05), 0.05)
+		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.2)
+		death_tween.finished.connect(_on_death_animation_finished)
+
+func _play_death_animation_lightning() -> void:
+	"""Death animation for lightning attacks."""
+	print("Playing lightning death animation")
+	
+	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_lightning"):
+		dummy_sprite.play("death_lightning")
+	else:
+		# Fallback: Electrocution effect - flash white/yellow and vibrate
+		var death_tween = create_tween()
+		# Flash rapidly
+		for i in range(5):
+			death_tween.tween_property(visual_root, "modulate", Color.YELLOW, 0.05)
+			death_tween.tween_property(visual_root, "modulate", Color.WHITE, 0.05)
+			# Add position shake
+			death_tween.tween_callback(func(): visual_root.position.x += randf_range(-5, 5))
+		# Final fade
+		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.2)
+		death_tween.finished.connect(_on_death_animation_finished)
+
+func _on_death_animation_finished() -> void:
+	"""Called when death animation completes."""
+	print("Death animation finished - dummy removed")
+	# TODO: Could spawn a new dummy here or trigger game over/next wave
+	queue_free()

@@ -1,31 +1,23 @@
-extends Area2D
+extends "res://Scripts/BaseProjectile.gd"
 
-## Thunderbolt projectile skill with enhanced VFX
+## Thunderbolt projectile - DoT (Damage over Time) that sticks to enemies
 
-@onready var visual: Node2D = $Visual
-@onready var outer_glow: Sprite2D = $Visual/OuterGlow
-@onready var core_glow: Sprite2D = $Visual/CoreGlow
-@onready var main_bolt: AnimatedSprite2D = $Visual/MainBolt
-
-# Projectile properties
-var velocity: Vector2 = Vector2.ZERO
-var damage: int = 50
-var speed: float = 600.0
-var hit_enemies: Array = []
-
-# VFX nodes (created dynamically)
-var point_light: PointLight2D
-var particles: GPUParticles2D
+# DoT properties
+var damage_per_tick: int = 10
+var damage_interval: float = 0.15
+var is_attached: bool = false
+var attached_target = null
+var damage_timer: Timer
+const TOTAL_TICKS: int = 10  # Always tick this many times when attached
+var ticks_remaining: int = TOTAL_TICKS
 
 func _ready() -> void:
-	_setup_enhanced_vfx()
+	super._ready()
+	_setup_damage_timer()
+	_setup_thunderbolt_vfx()
 
-func _setup_enhanced_vfx() -> void:
-	"""Create amazing visual effects with sprite layers!"""
-	
-	# Setup additive blending for glowing effect
-	_setup_additive_materials()
-	
+func _setup_thunderbolt_vfx() -> void:
+	"""Thunderbolt-specific visual effects."""
 	# Add dynamic lighting for extra glow
 	point_light = PointLight2D.new()
 	add_child(point_light)
@@ -40,19 +32,11 @@ func _setup_enhanced_vfx() -> void:
 	light_tween.tween_property(point_light, "energy", 1.2, 0.08)
 	light_tween.tween_property(point_light, "energy", 1.8, 0.06)
 	
-	# Animate the main bolt (cycles through your lightning frames)
-	if main_bolt and main_bolt.sprite_frames:
-		main_bolt.play("default")
-	
 	# Pulsing outer glow ring (breathing effect)
 	if outer_glow:
 		var glow_scale_tween = create_tween().set_loops()
-		glow_scale_tween.tween_property(outer_glow, "scale", Vector2(1.7, 1.7), 0.15)
-		glow_scale_tween.tween_property(outer_glow, "scale", Vector2(1.4, 1.4), 0.15)
-		
-		# Rotate the outer glow for motion
-		var glow_rotation_tween = create_tween().set_loops()
-		glow_rotation_tween.tween_property(outer_glow, "rotation", TAU, 1.0)
+		glow_scale_tween.tween_property(outer_glow, "scale", Vector2(0.85, 0.12), 0.15)
+		glow_scale_tween.tween_property(outer_glow, "scale", Vector2(0.7, 0.10), 0.15)
 	
 	# Pulse the core glow (bright flash effect)
 	if core_glow:
@@ -61,16 +45,12 @@ func _setup_enhanced_vfx() -> void:
 		core_tween.tween_property(core_glow, "modulate", Color(1.5, 1.5, 1.5, 0.8), 0.1)
 		core_tween.tween_property(core_glow, "modulate", Color(1.0, 1.0, 1.0, 1), 0.08)
 	
-	# Subtle overall scale pulse
-	var scale_tween = create_tween().set_loops()
-	scale_tween.tween_property(visual, "scale", Vector2(1.1, 1.1), 0.12)
-	scale_tween.tween_property(visual, "scale", Vector2(0.95, 0.95), 0.1)
-	
 	# Color shift over time (white -> blue -> purple)
-	var color_tween = create_tween()
-	color_tween.tween_property(main_bolt, "modulate", Color(0.9, 0.95, 1.0), 0.4)
-	color_tween.tween_property(main_bolt, "modulate", Color(0.8, 0.85, 1.0), 0.4)
-	color_tween.tween_property(main_bolt, "modulate", Color(0.9, 0.75, 1.0), 0.5)
+	if main_bolt:
+		var color_tween = create_tween()
+		color_tween.tween_property(main_bolt, "modulate", Color(0.9, 0.95, 1.0), 0.4)
+		color_tween.tween_property(main_bolt, "modulate", Color(0.8, 0.85, 1.0), 0.4)
+		color_tween.tween_property(main_bolt, "modulate", Color(0.9, 0.75, 1.0), 0.5)
 	
 	# Add trailing particles
 	particles = GPUParticles2D.new()
@@ -78,30 +58,10 @@ func _setup_enhanced_vfx() -> void:
 	particles.amount = 30
 	particles.lifetime = 0.4
 	particles.emitting = true
-	particles.local_coords = false  # Particles stay in world space (not relative to bolt)
+	particles.local_coords = false
 	particles.process_material = _create_particle_material()
 	particles.z_index = -1
 	particles.texture = preload("res://Assets/Sprites/Particles/spark_01.png")
-
-func _setup_additive_materials() -> void:
-	"""Setup additive blending materials for glowing sprites."""
-	# Create additive material for outer glow
-	if outer_glow:
-		var outer_material = CanvasItemMaterial.new()
-		outer_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		outer_glow.material = outer_material
-	
-	# Create additive material for core glow
-	if core_glow:
-		var core_material = CanvasItemMaterial.new()
-		core_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		core_glow.material = core_material
-	
-	# Main bolt can use normal or additive - try both!
-	if main_bolt:
-		var bolt_material = CanvasItemMaterial.new()
-		bolt_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-		main_bolt.material = bolt_material
 
 func _create_particle_material() -> ParticleProcessMaterial:
 	"""Create particle material for trailing sparks."""
@@ -114,157 +74,100 @@ func _create_particle_material() -> ParticleProcessMaterial:
 	particle_mat.initial_velocity_max = 150.0
 	particle_mat.gravity = Vector3.ZERO
 	
-	# Make emission truly omnidirectional
-	particle_mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	particle_mat.emission_sphere_radius = 15.0
+	# Fade and scale over lifetime
+	particle_mat.scale_min = 0.3
+	particle_mat.scale_max = 0.8
 	
 	# Enable rotation flags
-	particle_mat.particle_flag_disable_z = true  # Keep particles flat in 2D
-	particle_mat.particle_flag_align_y = false  # Don't auto-rotate to velocity
-	particle_mat.particle_flag_rotate_y = false  # Don't rotate in 3D space
+	particle_mat.particle_flag_disable_z = true
+	particle_mat.particle_flag_align_y = false
+	particle_mat.particle_flag_rotate_y = false
 	
 	# Random initial rotation for each particle (starting angle)
 	particle_mat.angle_min = 0.0
 	particle_mat.angle_max = 360.0
 	
 	# Random spinning motion over time
-	particle_mat.angular_velocity_min = -360.0  # Degrees per second
+	particle_mat.angular_velocity_min = -360.0
 	particle_mat.angular_velocity_max = 360.0
-	
-	# Appearance
-	particle_mat.scale_min = 0.1
-	particle_mat.scale_max = 0.7
-	particle_mat.scale_curve = _create_scale_curve()
-	
-	# Fade out over lifetime
-	particle_mat.color = Color(0.6, 0.85, 1.0, 1.0)
-	var gradient = Gradient.new()
-	gradient.set_color(0, Color(1, 1, 1, 1))
-	gradient.set_color(1, Color(0.4, 0.7, 1, 0))
-	particle_mat.color_ramp = gradient
 	
 	return particle_mat
 
-func _create_scale_curve() -> Curve:
-	"""Particles shrink over their lifetime."""
-	var curve = Curve.new()
-	curve.add_point(Vector2(0, 1.0))   # Start at full size
-	curve.add_point(Vector2(1, 0.3))   # End at 30% size
-	return curve
-
-func _physics_process(delta: float) -> void:
-	# Move the projectile
-	position += velocity * delta
+func _setup_damage_timer() -> void:
+	"""Setup the damage over time timer."""
+	damage_timer = Timer.new()
+	add_child(damage_timer)
+	damage_timer.wait_time = damage_interval
+	damage_timer.timeout.connect(_on_damage_tick)
 
 func setup(direction: Vector2, projectile_damage: int = 50) -> void:
-	"""Initialize the projectile with direction and damage."""
-	velocity = direction.normalized() * speed
-	damage = projectile_damage
-	
-	# Rotate visual to face direction
-	visual.rotation = direction.angle()
+	"""Setup projectile with DoT damage calculation."""
+	super.setup(direction, projectile_damage)
+	# Calculate damage per tick to match total damage over TOTAL_TICKS
+	damage_per_tick = max(10, int(float(damage) / float(TOTAL_TICKS)))
+
+func _physics_process(delta: float) -> void:
+	"""Override: Stop movement when attached to target."""
+	if not is_attached:
+		position += velocity * delta
 
 func _on_area_entered(area: Area2D) -> void:
-	# Hit an enemy
+	"""Handle collision with enemies - attach and start DoT."""
 	var target = area.get_parent()
-	
-	# Don't hit the same enemy twice
-	if target in hit_enemies:
-		return
-	
-	hit_enemies.append(target)
-	
-	# Deal damage
-	if target.has_method("take_damage"):
-		target.take_damage(damage, "hit_effect")  # Can specify different hit animations later
-	
-	# Create impact effect
-	_create_impact_effect()
-	
-	# Destroy projectile after hitting
-	_destroy()
+	if target and not is_attached:
+		_attach_to_target(target)
 
-func _on_body_entered(_body: Node2D) -> void:
-	# Hit a wall or solid object
-	_destroy()
-
-func _on_lifetime_timeout() -> void:
-	# Projectile expired
-	_destroy()
-
-func _create_impact_effect() -> void:
-	"""Create a satisfying impact explosion effect."""
-	# Screen shake on impact
-	_trigger_screen_shake(5.0, 0.15)
+func _attach_to_target(target) -> void:
+	"""Attach to target and start dealing damage over time."""
+	is_attached = true
+	attached_target = target
+	velocity = Vector2.ZERO
 	
-	# Bright flash
-	var flash_tween = create_tween()
-	flash_tween.tween_property(point_light, "energy", 4.0, 0.05)
-	flash_tween.tween_property(point_light, "energy", 0.0, 0.15)
+	# Stop the lifetime timer
+	var lifetime_timer = $Lifetime
+	if lifetime_timer:
+		lifetime_timer.stop()
 	
-	# Expand and fade the visual
-	var impact_tween = create_tween()
-	impact_tween.set_parallel(true)
-	impact_tween.tween_property(visual, "scale", Vector2(2.5, 2.5), 0.2)
-	impact_tween.tween_property(visual, "modulate:a", 0.0, 0.2)
+	# Reset tick counter
+	ticks_remaining = TOTAL_TICKS
 	
-	# Burst particles outward
 	if particles:
 		particles.emitting = false
-		var burst = GPUParticles2D.new()
-		get_parent().add_child(burst)
-		burst.global_position = global_position
-		burst.amount = 20
-		burst.lifetime = 0.3
-		burst.one_shot = true
-		burst.explosiveness = 1.0
-		burst.emitting = true
-		
-		var burst_material = ParticleProcessMaterial.new()
-		burst_material.direction = Vector3(0, 0, 0)
-		burst_material.spread = 180.0
-		burst_material.initial_velocity_min = 200.0
-		burst_material.initial_velocity_max = 400.0
-		burst_material.gravity = Vector3.ZERO
-		burst_material.scale_min = 3.0
-		burst_material.scale_max = 6.0
-		burst_material.color = Color(0.8, 0.9, 1.0, 1.0)
-		
-		var burst_gradient = Gradient.new()
-		burst_gradient.set_color(0, Color(1, 1, 1, 1))
-		burst_gradient.set_color(1, Color(0.4, 0.7, 1, 0))
-		burst_material.color_ramp = burst_gradient
-		
-		burst.process_material = burst_material
-		
-		# Clean up burst after it's done
-		await get_tree().create_timer(0.5).timeout
-		burst.queue_free()
+	
+	damage_timer.start()
+	
+	# Initial damage hit (counts as first tick)
+	ticks_remaining -= 1
+	_deal_damage_to_target()
+	
+	_play_attachment_effect()
 
-func _trigger_screen_shake(intensity: float, duration: float) -> void:
-	"""Trigger a screen shake effect."""
-	var camera = get_viewport().get_camera_2d()
-	if not camera:
+func _on_damage_tick() -> void:
+	"""Called each damage interval to deal DoT damage."""
+	if not is_attached or not attached_target or not is_instance_valid(attached_target):
+		_destroy()
 		return
 	
-	var original_offset = camera.offset
-	var shake_tween = create_tween()
+	if ticks_remaining <= 0:
+		_destroy()
+		return
 	
-	# Rapid shake
-	var shake_count = int(duration / 0.02)
-	for i in range(shake_count):
-		var random_offset = Vector2(
-			randf_range(-intensity, intensity),
-			randf_range(-intensity, intensity)
-		)
-		shake_tween.tween_property(camera, "offset", random_offset, 0.02)
-	
-	# Return to original
-	shake_tween.tween_property(camera, "offset", original_offset, 0.05)
+	ticks_remaining -= 1
+	_deal_damage_to_target()
 
-func _destroy() -> void:
-	"""Destroy the projectile with a fade effect."""
-	# Quick fade out
-	var tween = create_tween()
-	tween.tween_property(self, "modulate:a", 0.0, 0.2)
-	tween.tween_callback(queue_free)
+func _deal_damage_to_target() -> void:
+	"""Apply damage to the attached target."""
+	if attached_target.has_method("take_damage"):
+		attached_target.take_damage(damage_per_tick, global_position, "hit_effect", "lightning")
+	_play_damage_flash()
+
+func _play_attachment_effect() -> void:
+	"""Visual effect when attaching to target."""
+	if visual:
+		var attach_tween = create_tween()
+		attach_tween.set_parallel(true)
+		attach_tween.tween_property(visual, "scale", Vector2(1.3, 1.3), 0.1)
+		attach_tween.tween_property(visual, "modulate", Color(1.5, 1.5, 2.0), 0.1)
+		attach_tween.chain().set_parallel(true)
+		attach_tween.tween_property(visual, "scale", Vector2(1.0, 1.0), 0.2)
+		attach_tween.tween_property(visual, "modulate", Color.WHITE, 0.2)

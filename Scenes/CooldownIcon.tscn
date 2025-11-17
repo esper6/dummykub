@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://c8ym3qkr1vh2k"]
 
-[ext_resource type="Script" path="res://Scripts/CooldownIcon.gd" id="1_cooldown"]
+[ext_resource type="Script" uid="uid://ma3amjold5w3" path="res://Scripts/CooldownIcon.gd" id="1_cooldown"]
 
 [node name="CooldownIcon" type="Control"]
 custom_minimum_size = Vector2(64, 64)
@@ -94,4 +94,3 @@ theme_override_constants/outline_size = 2
 theme_override_font_sizes/font_size = 14
 text = "LMB"
 horizontal_alignment = 1
-

@@ -67,4 +67,24 @@ sprite_frames = SubResource("SpriteFrames_kh1t2")
 animation = &"hit_effect"
 frame_progress = 1.0
 
+[node name="HealthBar" type="ProgressBar" parent="."]
+z_index = 10
+offset_left = -60.0
+offset_top = -200.0
+offset_right = 60.0
+offset_bottom = -185.0
+max_value = 500.0
+value = 500.0
+show_percentage = false
+
+[node name="HealthBarBackground" type="ColorRect" parent="HealthBar"]
+z_index = -1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.2, 0.2, 0.2, 0.8)
+
 [connection signal="timeout" from="HitstopTimer" to="." method="_on_hitstop_timer_timeout"]

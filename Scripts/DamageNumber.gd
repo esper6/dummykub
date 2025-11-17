@@ -38,4 +38,3 @@ func _process(delta: float) -> void:
 	# Delete when done
 	if lifetime <= 0:
 		queue_free()
-

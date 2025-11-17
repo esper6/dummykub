@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=4 uid="uid://d2ak5p6ml1vwf"]
+[gd_scene load_steps=14 format=4 uid="uid://d2ak5p6ml1vwf"]
 
 [ext_resource type="Script" uid="uid://crye6d3lha3pj" path="res://Scripts/GameManager.gd" id="1_gamemanager"]
 [ext_resource type="PackedScene" uid="uid://csgk5qd7oe8pb" path="res://Scenes/Player.tscn" id="2_player"]
@@ -6,6 +6,8 @@
 [ext_resource type="Texture2D" uid="uid://dpdiffohe4et0" path="res://Assets/Tilesets/medieval_tilesheet.png" id="4_b2bpf"]
 [ext_resource type="Texture2D" uid="uid://dg4w8pt71a2p3" path="res://Assets/Tilesets/tilemap.png" id="5_7lihs"]
 [ext_resource type="PackedScene" uid="uid://brgtjw7w5vr05" path="res://Scenes/UIManager.tscn" id="7_uimanager"]
+[ext_resource type="PackedScene" uid="uid://bk3h5y8n7qw4m" path="res://Scenes/PauseMenu.tscn" id="8_pausemenu"]
+[ext_resource type="Script" path="res://Scripts/LevelUpScreen.gd" id="9_levelup"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
 size = Vector2(1920, 200)
@@ -4820,6 +4822,129 @@ shape = SubResource("RectangleShape2D_wall")
 
 [node name="UIManager" parent="." instance=ExtResource("7_uimanager")]
 
+[node name="PauseMenu" parent="." instance=ExtResource("8_pausemenu")]
+
+[node name="LevelUpScreen" type="CanvasLayer" parent="."]
+process_mode = 3
+visible = false
+script = ExtResource("9_levelup")
+
+[node name="Overlay" type="ColorRect" parent="LevelUpScreen"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="Panel" type="Panel" parent="LevelUpScreen"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -300.0
+offset_right = 400.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="LevelUpScreen/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="TitleLabel" type="Label" parent="LevelUpScreen/Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 56
+text = "LEVEL UP!"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="LevelUpScreen/Panel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Choose Your First Skill"
+horizontal_alignment = 1
+
+[node name="Spacer1" type="Control" parent="LevelUpScreen/Panel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="SkillsContainer" type="HBoxContainer" parent="LevelUpScreen/Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 30
+
+[node name="ThunderboltButton" type="VBoxContainer" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer"]
+layout_mode = 2
+
+[node name="Button" type="Button" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/ThunderboltButton"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "⚡
+THUNDERBOLT"
+
+[node name="Description" type="Label" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/ThunderboltButton"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Lightning projectile
+that sticks to enemies
+and deals damage
+over time"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="FireballButton" type="VBoxContainer" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer"]
+layout_mode = 2
+
+[node name="Button" type="Button" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/FireballButton"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.5, 0.2, 1)
+theme_override_font_sizes/font_size = 32
+text = "🔥
+FIREBALL"
+
+[node name="Description" type="Label" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/FireballButton"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Explosive fireball
+that deals damage
+in an area"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="IceLanceButton" type="VBoxContainer" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer"]
+layout_mode = 2
+
+[node name="Button" type="Button" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/IceLanceButton"]
+custom_minimum_size = Vector2(200, 200)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "❄️
+ICE LANCE"
+
+[node name="Description" type="Label" parent="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/IceLanceButton"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Piercing ice lance
+that slows and
+damages enemies"
+horizontal_alignment = 1
+autowrap_mode = 2
+
 [node name="UI" type="CanvasLayer" parent="."]
 
 [node name="TimerLabel" type="Label" parent="UI"]
@@ -4870,6 +4995,46 @@ theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
 theme_override_font_sizes/font_size = 42
 text = "Total: 0"
 horizontal_alignment = 1
+
+[node name="LevelLabel" type="Label" parent="UI"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -100.0
+offset_right = 150.0
+offset_bottom = -60.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 32
+text = "Level 1"
+vertical_alignment = 1
+
+[node name="ExpBar" type="ProgressBar" parent="UI"]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -55.0
+offset_right = 420.0
+offset_bottom = -30.0
+grow_vertical = 0
+show_percentage = false
+
+[node name="ExpLabel" type="Label" parent="UI/ExpBar"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 2
+theme_override_font_sizes/font_size = 16
+text = "0 / 100 EXP"
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="GoLabel" type="Label" parent="UI"]
 visible = false
@@ -4963,3 +5128,6 @@ tile_set = SubResource("TileSet_bf53h")
 
 [connection signal="pressed" from="UI/GameOverPanel/VBoxContainer/RetryButton" to="." method="_on_retry_button_pressed"]
 [connection signal="pressed" from="UI/GameOverPanel/VBoxContainer/MenuButton" to="." method="_on_menu_button_pressed"]
+[connection signal="pressed" from="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/ThunderboltButton/Button" to="LevelUpScreen" method="_on_skill_selected" binds= ["thunderbolt"]]
+[connection signal="pressed" from="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/FireballButton/Button" to="LevelUpScreen" method="_on_skill_selected" binds= ["fireball"]]
+[connection signal="pressed" from="LevelUpScreen/Panel/VBoxContainer/SkillsContainer/IceLanceButton/Button" to="LevelUpScreen" method="_on_skill_selected" binds= ["icelance"]]

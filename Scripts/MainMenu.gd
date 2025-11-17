@@ -6,6 +6,7 @@ extends Control
 @onready var continue_button: Button = $VBoxContainer/ContinueButton
 @onready var settings_button: Button = $VBoxContainer/SettingsButton
 @onready var quit_button: Button = $VBoxContainer/QuitButton
+@onready var god_mode_toggle: CheckButton = $GodModeToggle
 
 func _ready() -> void:
 	# Check if there's a save file to enable/disable continue button
@@ -15,8 +16,14 @@ func _ready() -> void:
 	else:
 		continue_button.disabled = true
 	
+	# Set initial god mode state
+	god_mode_toggle.button_pressed = DebugSettings.god_mode
+	
 	# Focus the play button by default
 	play_button.grab_focus()
+
+func _on_god_mode_toggled(toggled_on: bool) -> void:
+	DebugSettings.god_mode = toggled_on
 
 func _on_play_button_pressed() -> void:
 	# Start a new game
@@ -36,4 +43,3 @@ func _on_settings_button_pressed() -> void:
 func _on_quit_button_pressed() -> void:
 	# Quit the game
 	get_tree().quit()
-

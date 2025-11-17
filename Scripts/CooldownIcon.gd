@@ -97,4 +97,3 @@ func _end_cooldown() -> void:
 func force_end_cooldown() -> void:
 	"""Immediately end cooldown (for external calls)."""
 	_end_cooldown()
-

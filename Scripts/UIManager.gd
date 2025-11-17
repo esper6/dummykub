@@ -42,10 +42,18 @@ func setup_player_connections(player: Node) -> void:
 		player.attack_cooldown_started.connect(_on_attack_cooldown_started)
 	if player.has_signal("skill_cooldown_started"):
 		player.skill_cooldown_started.connect(_on_skill_cooldown_started)
+	if player.has_signal("no_cooldown_activated"):
+		player.no_cooldown_activated.connect(_on_no_cooldown_activated)
 
 func _on_attack_cooldown_started(duration: float) -> void:
 	attack_icon.start_cooldown(duration)
 
 func _on_skill_cooldown_started(duration: float) -> void:
 	skill_icon.start_cooldown(duration)
+
+func _on_no_cooldown_activated() -> void:
+	"""Force end all cooldown animations when No Cooldown buff is active."""
+	attack_icon.force_end_cooldown()
+	skill_icon.force_end_cooldown()
+	print("UI: Cooldown animations cleared!")
 

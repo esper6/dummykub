@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://buv7q3ykr8shq"]
+[gd_scene load_steps=9 format=3 uid="uid://dkmakbibc6utu"]
 
 [ext_resource type="Script" uid="uid://diejsj6y8qp8d" path="res://Scripts/Thunderbolt.gd" id="1_thunderbolt"]
 [ext_resource type="Texture2D" uid="uid://nu25auhieek7" path="res://Assets/Sprites/Particles/circle_03.png" id="2_a0kuq"]
@@ -74,25 +74,22 @@ shape = SubResource("CircleShape2D_thunderbolt")
 
 [node name="OuterGlow" type="Sprite2D" parent="Visual"]
 z_index = -2
-position = Vector2(-3, 16)
-scale = Vector2(0.6972656, 0.6972656)
+position = Vector2(-6, -3.9999695)
+scale = Vector2(0.6972656, 0.10058595)
 texture = ExtResource("2_a0kuq")
 
 [node name="CoreGlow" type="Sprite2D" parent="Visual"]
 z_index = -1
-position = Vector2(-1.0999756, 4.9000125)
-scale = Vector2(0.8042969, 0.78085935)
+position = Vector2(1.0000305, -3.0000153)
+scale = Vector2(0.1148438, 0.09765622)
 texture = ExtResource("3_k3ys3")
 
 [node name="MainBolt" type="AnimatedSprite2D" parent="Visual"]
-position = Vector2(-6, -3.9999847)
-scale = Vector2(0.5449219, 0.42578125)
+position = Vector2(-2.999999, 4.000001)
+scale = Vector2(0.5078125, 0.24023438)
 sprite_frames = SubResource("SpriteFrames_inudk")
-frame = 9
-frame_progress = 0.7800327
 
 [node name="Lifetime" type="Timer" parent="."]
-wait_time = 3.0
 one_shot = true
 autostart = true
 

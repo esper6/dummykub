@@ -1,0 +1,432 @@
+[gd_scene load_steps=3 format=3 uid="uid://bk3h5y8n7qw4m"]
+
+[ext_resource type="Script" uid="uid://clkm8p7n5qr3w" path="res://Scripts/PauseMenu.gd" id="1_pausemenu"]
+[ext_resource type="Script" uid="uid://bs7t3m6oaqr5x" path="res://Scripts/InGameSettings.gd" id="2_ingamesettings"]
+
+[node name="PauseMenu" type="CanvasLayer"]
+layer = 100
+script = ExtResource("1_pausemenu")
+
+[node name="PausePanel" type="Panel" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="DimBackground" type="ColorRect" parent="PausePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="MenuContainer" type="VBoxContainer" parent="PausePanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -300.0
+offset_right = 200.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="TitleLabel" type="Label" parent="PausePanel/MenuContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 64
+text = "PAUSED"
+horizontal_alignment = 1
+
+[node name="Spacer1" type="Control" parent="PausePanel/MenuContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="ResumeButton" type="Button" parent="PausePanel/MenuContainer"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Resume (ESC)"
+
+[node name="ControlsButton" type="Button" parent="PausePanel/MenuContainer"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Controls"
+
+[node name="SettingsButton" type="Button" parent="PausePanel/MenuContainer"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Settings"
+
+[node name="MainMenuButton" type="Button" parent="PausePanel/MenuContainer"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Main Menu"
+
+[node name="Spacer2" type="Control" parent="PausePanel/MenuContainer"]
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+
+[node name="ControlsPanel" type="Panel" parent="PausePanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -500.0
+offset_top = 100.0
+offset_right = 500.0
+offset_bottom = 450.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PausePanel/ControlsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -9.0
+offset_top = -637.0
+offset_right = -9.0
+offset_bottom = -177.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 30
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 30
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PausePanel/ControlsPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="TitleLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 48
+text = "CONTROLS"
+horizontal_alignment = 1
+
+[node name="TitleSpacer" type="Control" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="KBMLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.7, 1, 1)
+theme_override_font_sizes/font_size = 28
+text = "KEYBOARD & MOUSE"
+horizontal_alignment = 1
+
+[node name="KBMGrid" type="GridContainer" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/h_separation = 40
+theme_override_constants/v_separation = 10
+columns = 2
+
+[node name="MoveLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Move:"
+
+[node name="MoveKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "A/D or Arrow Keys"
+
+[node name="JumpLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Jump:"
+
+[node name="JumpKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "Space or W (Press twice for double jump)"
+
+[node name="AttackLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Attack:"
+
+[node name="AttackKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "Left Mouse Button"
+
+[node name="SkillLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Skill (Thunderbolt):"
+
+[node name="SkillKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "Right Mouse Button"
+
+[node name="PogoLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Pogo Attack:"
+
+[node name="PogoKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/KBMGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "S + Left Click (in air)"
+
+[node name="Spacer" type="Control" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 15)
+layout_mode = 2
+
+[node name="ControllerLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 1, 0.4, 1)
+theme_override_font_sizes/font_size = 28
+text = "CONTROLLER"
+horizontal_alignment = 1
+
+[node name="ControllerGrid" type="GridContainer" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/h_separation = 40
+theme_override_constants/v_separation = 10
+columns = 2
+
+[node name="MoveLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Move:"
+
+[node name="MoveKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "D-Pad Left/Right"
+
+[node name="JumpLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Jump:"
+
+[node name="JumpKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "A Button (Press twice for double jump)"
+
+[node name="AttackLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Attack:"
+
+[node name="AttackKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "X Button"
+
+[node name="SkillLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Skill (Thunderbolt):"
+
+[node name="SkillKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "Y Button"
+
+[node name="PogoLabel" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "Pogo Attack:"
+
+[node name="PogoKeys" type="Label" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/ControllerGrid"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.7, 1, 0.7, 1)
+theme_override_font_sizes/font_size = 22
+text = "D-Pad Down + X (in air)"
+
+[node name="BottomSpacer" type="Control" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="PausePanel/ControlsPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Back (ESC)"
+
+[node name="InGameSettings" type="Panel" parent="PausePanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -300.0
+offset_right = 400.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_ingamesettings")
+
+[node name="MarginContainer" type="MarginContainer" parent="PausePanel/InGameSettings"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PausePanel/InGameSettings/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 25
+
+[node name="TitleLabel" type="Label" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 48
+text = "SETTINGS"
+horizontal_alignment = 1
+
+[node name="MasterVolumeContainer" type="HBoxContainer" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Label" type="Label" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MasterVolumeContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Master Volume:"
+
+[node name="Slider" type="HSlider" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MasterVolumeContainer"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="ValueLabel" type="Label" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MasterVolumeContainer"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "100%"
+
+[node name="SFXVolumeContainer" type="HBoxContainer" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Label" type="Label" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/SFXVolumeContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "SFX Volume:"
+
+[node name="Slider" type="HSlider" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/SFXVolumeContainer"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="ValueLabel" type="Label" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/SFXVolumeContainer"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "100%"
+
+[node name="MusicVolumeContainer" type="HBoxContainer" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Label" type="Label" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MusicVolumeContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Music Volume:"
+
+[node name="Slider" type="HSlider" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MusicVolumeContainer"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1.0
+step = 0.01
+value = 1.0
+
+[node name="ValueLabel" type="Label" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MusicVolumeContainer"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "100%"
+
+[node name="FullscreenCheck" type="CheckButton" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Fullscreen"
+
+[node name="VSyncCheck" type="CheckButton" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+button_pressed = true
+text = "VSync"
+
+[node name="BackButton" type="Button" parent="PausePanel/InGameSettings/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "Back"
+
+[connection signal="pressed" from="PausePanel/MenuContainer/ResumeButton" to="." method="_on_resume_button_pressed"]
+[connection signal="pressed" from="PausePanel/MenuContainer/ControlsButton" to="." method="_on_controls_button_pressed"]
+[connection signal="pressed" from="PausePanel/MenuContainer/SettingsButton" to="." method="_on_settings_button_pressed"]
+[connection signal="pressed" from="PausePanel/MenuContainer/MainMenuButton" to="." method="_on_main_menu_button_pressed"]
+[connection signal="pressed" from="PausePanel/ControlsPanel/MarginContainer/VBoxContainer/BackButton" to="." method="_on_controls_back_button_pressed"]
+[connection signal="value_changed" from="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MasterVolumeContainer/Slider" to="PausePanel/InGameSettings" method="_on_master_volume_changed"]
+[connection signal="value_changed" from="PausePanel/InGameSettings/MarginContainer/VBoxContainer/SFXVolumeContainer/Slider" to="PausePanel/InGameSettings" method="_on_sfx_volume_changed"]
+[connection signal="value_changed" from="PausePanel/InGameSettings/MarginContainer/VBoxContainer/MusicVolumeContainer/Slider" to="PausePanel/InGameSettings" method="_on_music_volume_changed"]
+[connection signal="toggled" from="PausePanel/InGameSettings/MarginContainer/VBoxContainer/FullscreenCheck" to="PausePanel/InGameSettings" method="_on_fullscreen_toggled"]
+[connection signal="toggled" from="PausePanel/InGameSettings/MarginContainer/VBoxContainer/VSyncCheck" to="PausePanel/InGameSettings" method="_on_vsync_toggled"]
+[connection signal="pressed" from="PausePanel/InGameSettings/MarginContainer/VBoxContainer/BackButton" to="PausePanel/InGameSettings" method="_on_back_button_pressed"]

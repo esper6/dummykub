@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://c5ym8qkr2vh3k"]
+
+[ext_resource type="Script" path="res://Scripts/ImpactParticles.gd" id="1_impactparticles"]
+
+[node name="ImpactParticles" type="Node2D"]
+z_index = 50
+script = ExtResource("1_impactparticles")
+
