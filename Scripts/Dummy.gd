@@ -12,7 +12,7 @@ var knockback_velocity: Vector2 = Vector2.ZERO
 var base_position: Vector2 = Vector2.ZERO
 
 # Health system
-const MAX_HEALTH: int = 500
+const MAX_HEALTH: int = 200
 var current_health: int = MAX_HEALTH
 var is_dead: bool = false
 
@@ -26,6 +26,11 @@ const ImpactParticles = preload("res://Scenes/ImpactParticles.tscn")
 
 func _ready() -> void:
 	base_position = visual_root.position
+	
+	# Initialize health bar to match MAX_HEALTH
+	if health_bar:
+		health_bar.max_value = MAX_HEALTH
+		health_bar.value = current_health
 	
 	# Show dummy and start with idle animation
 	if dummy_sprite:
@@ -82,7 +87,7 @@ func take_damage(damage: int, hit_from_position: Vector2 = Vector2.ZERO, hit_ani
 	var knockback_dir = Vector2.RIGHT if hit_from_position.x < global_position.x else Vector2.LEFT
 	knockback_velocity = knockback_dir * KNOCKBACK_STRENGTH
 	
-	# Visual feedback - shake and scale
+	# Visual feedback - shake and scale (base/post)
 	var tween = create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(visual_root, "scale", Vector2(0.9, 1.1), 0.05)
@@ -90,6 +95,13 @@ func take_damage(damage: int, hit_from_position: Vector2 = Vector2.ZERO, hit_ani
 	tween.chain().set_parallel(true)
 	tween.tween_property(visual_root, "scale", Vector2.ONE, 0.15)
 	tween.tween_property(visual_root, "rotation", 0.0, 0.15)
+	
+	# Also shake the dummy sprite for impact
+	var sprite_tween = create_tween()
+	var original_pos = dummy_sprite.position
+	for i in range(3):
+		sprite_tween.tween_property(dummy_sprite, "position:x", original_pos.x + randf_range(-3, 3), 0.03)
+	sprite_tween.tween_property(dummy_sprite, "position", original_pos, 0.05)
 	
 	# Start hitstop
 	_start_hitstop()
@@ -217,12 +229,17 @@ func _play_death_animation_physical() -> void:
 	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_physical"):
 		dummy_sprite.play("death_physical")
 	else:
-		# Fallback: dramatic fall and fade
+		# Fallback: dramatic fall and fade (apply to BOTH visual_root and dummy_sprite)
 		var death_tween = create_tween()
 		death_tween.set_parallel(true)
+		# Rotate and drop both the base/post and the dummy sprite
 		death_tween.tween_property(visual_root, "rotation", -PI/2, 0.5).set_ease(Tween.EASE_IN)
 		death_tween.tween_property(visual_root, "position:y", visual_root.position.y + 100, 0.5).set_ease(Tween.EASE_IN)
 		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.5)
+		# Also rotate and fade the dummy sprite
+		death_tween.tween_property(dummy_sprite, "rotation", -PI/2, 0.5).set_ease(Tween.EASE_IN)
+		death_tween.tween_property(dummy_sprite, "position:y", dummy_sprite.position.y + 100, 0.5).set_ease(Tween.EASE_IN)
+		death_tween.tween_property(dummy_sprite, "modulate:a", 0.0, 0.5)
 		death_tween.finished.connect(_on_death_animation_finished)
 
 func _play_death_animation_fire() -> void:
@@ -234,10 +251,19 @@ func _play_death_animation_fire() -> void:
 	else:
 		# Fallback: Burn up effect - flash red and disintegrate
 		var death_tween = create_tween()
+		# Flash base/post red
 		death_tween.tween_property(visual_root, "modulate", Color.ORANGE_RED, 0.2)
 		death_tween.tween_property(visual_root, "modulate", Color.DARK_RED, 0.2)
 		death_tween.tween_property(visual_root, "scale", Vector2(1.2, 0.8), 0.3)
 		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.3)
+		
+		# Also flash dummy sprite with fire colors
+		var sprite_tween = create_tween()
+		sprite_tween.tween_property(dummy_sprite, "modulate", Color.ORANGE_RED, 0.2)
+		sprite_tween.tween_property(dummy_sprite, "modulate", Color.DARK_RED, 0.2)
+		sprite_tween.tween_property(dummy_sprite, "scale", Vector2(dummy_sprite.scale.x * 1.2, dummy_sprite.scale.y * 0.8), 0.3)
+		sprite_tween.tween_property(dummy_sprite, "modulate:a", 0.0, 0.3)
+		
 		death_tween.finished.connect(_on_death_animation_finished)
 
 func _play_death_animation_ice() -> void:
@@ -256,25 +282,63 @@ func _play_death_animation_ice() -> void:
 		death_tween.tween_property(visual_root, "scale", Vector2(0.9, 0.9), 0.05)
 		death_tween.tween_property(visual_root, "scale", Vector2(1.05, 1.05), 0.05)
 		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.2)
+		
+		# Also freeze and shatter the dummy sprite
+		var sprite_tween = create_tween()
+		sprite_tween.tween_property(dummy_sprite, "modulate", Color.CYAN, 0.3)
+		sprite_tween.tween_interval(0.2)
+		# Shatter effect on sprite
+		sprite_tween.tween_property(dummy_sprite, "scale", Vector2(dummy_sprite.scale.x * 1.1, dummy_sprite.scale.y * 1.1), 0.05)
+		sprite_tween.tween_property(dummy_sprite, "scale", Vector2(dummy_sprite.scale.x * 0.9, dummy_sprite.scale.y * 0.9), 0.05)
+		sprite_tween.tween_property(dummy_sprite, "scale", Vector2(dummy_sprite.scale.x * 1.05, dummy_sprite.scale.y * 1.05), 0.05)
+		sprite_tween.tween_property(dummy_sprite, "modulate:a", 0.0, 0.2)
+		
 		death_tween.finished.connect(_on_death_animation_finished)
 
 func _play_death_animation_lightning() -> void:
-	"""Death animation for lightning attacks."""
+	"""Death animation for lightning attacks - dramatic electrocution with buildup."""
 	print("Playing lightning death animation")
 	
 	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_lightning"):
 		dummy_sprite.play("death_lightning")
 	else:
-		# Fallback: Electrocution effect - flash white/yellow and vibrate
+		# Dramatic lightning death: charge up → violent shake → explode
 		var death_tween = create_tween()
-		# Flash rapidly
-		for i in range(5):
-			death_tween.tween_property(visual_root, "modulate", Color.YELLOW, 0.05)
-			death_tween.tween_property(visual_root, "modulate", Color.WHITE, 0.05)
-			# Add position shake
-			death_tween.tween_callback(func(): visual_root.position.x += randf_range(-5, 5))
-		# Final fade
-		death_tween.tween_property(visual_root, "modulate:a", 0.0, 0.2)
+		var sprite_tween = create_tween()
+		
+		# Phase 1: Charge up with increasing intensity (0.4s)
+		for i in range(8):
+			var intensity = float(i) / 8.0  # 0.0 to 1.0
+			var flash_time = 0.05 - (intensity * 0.02)  # Gets faster
+			
+			# Flash yellow/white with increasing brightness
+			var bright_yellow = Color(1.0, 1.0, 0.3 + intensity * 0.4)
+			death_tween.tween_property(visual_root, "modulate", bright_yellow, flash_time)
+			death_tween.tween_property(visual_root, "modulate", Color.WHITE, flash_time)
+			
+			sprite_tween.tween_property(dummy_sprite, "modulate", bright_yellow, flash_time)
+			sprite_tween.tween_property(dummy_sprite, "modulate", Color.WHITE, flash_time)
+			
+			# Vibrate with increasing violence
+			var shake_amount = 3.0 + (intensity * 7.0)  # 3px to 10px
+			death_tween.tween_callback(func(): visual_root.position += Vector2(randf_range(-shake_amount, shake_amount), randf_range(-shake_amount, shake_amount)))
+			sprite_tween.tween_callback(func(): dummy_sprite.position += Vector2(randf_range(-shake_amount, shake_amount), randf_range(-shake_amount, shake_amount)))
+		
+		# Phase 2: Peak electrocution - freeze white for a moment (0.1s)
+		death_tween.tween_property(visual_root, "modulate", Color.WHITE, 0.05)
+		sprite_tween.tween_property(dummy_sprite, "modulate", Color.WHITE, 0.05)
+		death_tween.tween_interval(0.05)
+		sprite_tween.tween_interval(0.05)
+		
+		# Phase 3: Explosive disintegration - scale up and fade
+		death_tween.set_parallel(true)
+		death_tween.tween_property(visual_root, "scale", Vector2(1.5, 1.5), 0.2)
+		death_tween.tween_property(visual_root, "modulate", Color(1.0, 1.0, 0.5, 0.0), 0.2)  # Yellow fade
+		
+		sprite_tween.set_parallel(true)
+		sprite_tween.tween_property(dummy_sprite, "scale", Vector2(dummy_sprite.scale.x * 1.5, dummy_sprite.scale.y * 1.5), 0.2)
+		sprite_tween.tween_property(dummy_sprite, "modulate", Color(1.0, 1.0, 0.5, 0.0), 0.2)  # Yellow fade
+		
 		death_tween.finished.connect(_on_death_animation_finished)
 
 func _on_death_animation_finished() -> void:

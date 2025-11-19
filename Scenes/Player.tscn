@@ -241,6 +241,15 @@ offset_right = 40.0
 offset_bottom = 30.0
 color = Color(1, 0.8, 0.2, 0.7)
 
+[node name="PowerupDisplay" type="HBoxContainer" parent="."]
+z_index = 100
+offset_left = -150.0
+offset_top = -140.0
+offset_right = 150.0
+offset_bottom = -76.0
+theme_override_constants/separation = 8
+alignment = 1
+
 [connection signal="timeout" from="ComboTimer" to="." method="_on_combo_timer_timeout"]
 [connection signal="timeout" from="HitstopTimer" to="." method="_on_hitstop_timer_timeout"]
 [connection signal="area_entered" from="WeaponHitbox" to="." method="_on_weapon_hitbox_area_entered"]

@@ -18,19 +18,21 @@ extends Node2D
 @onready var exp_bar: ProgressBar = $UI/ExpBar
 @onready var exp_label: Label = $UI/ExpBar/ExpLabel
 @onready var level_up_screen: CanvasLayer = $LevelUpScreen
+@onready var ability_up_screen: CanvasLayer = $AbilityUpScreen
+@onready var relic_screen: CanvasLayer = $RelicScreen
 
 const GAME_DURATION: float = 60.0
 const POWERUP_SPAWN_INTERVAL: float = 10.0  # Spawn power-up every 10 seconds
 const DUMMY_SPAWN_INTERVAL: float = 10.0  # Spawn dummy every 10 seconds
 const MAX_DUMMIES: int = 3  # Maximum dummies at once
 
-const DoubleJumpPowerup = preload("res://Scenes/DoubleJumpPowerup.tscn")
+# Power-ups (Double Jump removed - now a relic)
 const DamageMultiplierPowerup = preload("res://Scenes/DamageMultiplierPowerup.tscn")
 const ElementalImbue = preload("res://Scenes/ElementalImbue.tscn")
 const NoCooldownPowerup = preload("res://Scenes/NoCooldownPowerup.tscn")
 const Dummy = preload("res://Scenes/Dummy.tscn")
 
-# Power-up pool for random spawning
+# Power-up pool for random spawning (double jump removed, now a relic)
 var powerup_pool: Array = []
 
 var time_remaining: float = GAME_DURATION
@@ -48,7 +50,6 @@ var dummy_spawn_locations: Array = [
 	Vector2(400, 750),   # Far left
 	Vector2(1200, 800),  # Original position (right side)
 ]
-var next_dummy_spawn_index: int = 0
 
 # Power-up spawning system
 var time_since_last_powerup_spawn: float = 0.0
@@ -61,7 +62,6 @@ var powerup_spawn_locations: Array = [
 	Vector2(700, 700),   # Left mid-platform
 	Vector2(1200, 700),  # Right mid-platform
 ]
-var spawned_powerups: Array = []  # Track which power-ups have been spawned this round
 
 func _ready() -> void:
 	# Connect UI Manager to player cooldowns
@@ -77,6 +77,14 @@ func _ready() -> void:
 	# Connect level up screen signal
 	if level_up_screen:
 		level_up_screen.skill_chosen.connect(_on_skill_chosen)
+	
+	# Connect ability up screen signal (for level 3+)
+	if ability_up_screen:
+		ability_up_screen.ability_chosen.connect(_on_ability_chosen)
+	
+	# Connect relic screen signal (for end of level)
+	if relic_screen:
+		relic_screen.relic_chosen.connect(_on_relic_chosen)
 	
 	# Track the initial dummy
 	if dummy:
@@ -135,7 +143,7 @@ func _end_game() -> void:
 	if player:
 		player.game_over()
 	
-	# Show game over panel
+	# Show game over panel with stats
 	score_label.text = "Total Damage: " + str(total_damage)
 	hits_label.text = "Total Hits: " + str(total_hits)
 	game_over_panel.show()
@@ -180,36 +188,23 @@ func _start_game() -> void:
 
 func _spawn_random_powerup() -> void:
 	"""Spawn a random power-up at a random location."""
-	# Initialize power-up pool (equal weight for all)
+	# Initialize power-up pool (equal weight for all, double jump removed - now a relic)
 	if powerup_pool.is_empty():
 		powerup_pool = [
-			DoubleJumpPowerup,
 			DamageMultiplierPowerup,
 			ElementalImbue,
 			NoCooldownPowerup
 		]
 	
-	# Build available pool (excluding already spawned one-time power-ups)
-	var available_pool: Array = []
-	for powerup_scene in powerup_pool:
-		# Check if this is DoubleJump and if it's already been spawned
-		if powerup_scene == DoubleJumpPowerup and DoubleJumpPowerup in spawned_powerups:
-			continue  # Skip double jump if already spawned this round
-		available_pool.append(powerup_scene)
-	
 	# If no power-ups available, don't spawn
-	if available_pool.is_empty():
+	if powerup_pool.is_empty():
 		print("No power-ups available to spawn")
 		return
 	
-	# Pick a random power-up from available pool
-	var random_powerup_scene = available_pool[randi() % available_pool.size()]
+	# Pick a random power-up from pool
+	var random_powerup_scene = powerup_pool[randi() % powerup_pool.size()]
 	var powerup = random_powerup_scene.instantiate()
 	add_child(powerup)
-	
-	# Track that this power-up type has been spawned
-	if random_powerup_scene == DoubleJumpPowerup:
-		spawned_powerups.append(DoubleJumpPowerup)
 	
 	# Use random spawn location from the pool
 	var spawn_pos = powerup_spawn_locations[randi() % powerup_spawn_locations.size()]
@@ -240,6 +235,14 @@ func _on_player_level_up(new_level: int) -> void:
 	# Show level up screen at level 2 for skill selection
 	if new_level == 2 and level_up_screen:
 		level_up_screen.show_level_up()
+	
+	# Show ability screen at level 3 for ability selection
+	elif new_level == 3 and ability_up_screen:
+		ability_up_screen.show_ability_selection()
+	
+	# Show relic screen at level 4 for relic selection
+	elif new_level == 4 and relic_screen:
+		relic_screen.show_relic_selection()
 
 func _on_skill_chosen(skill_name: String) -> void:
 	"""Called when player chooses a skill from level up screen."""
@@ -248,6 +251,36 @@ func _on_skill_chosen(skill_name: String) -> void:
 	# Unlock the skill for the player
 	if player:
 		player.unlock_skill(skill_name)
+
+func _on_ability_chosen(ability_id: String) -> void:
+	"""Called when player chooses an ability from ability up screen."""
+	print("GameManager: Player chose ability: ", ability_id)
+	
+	# Apply the ability to the player
+	if player:
+		match ability_id:
+			"attack_speed":
+				player.increase_attack_speed(1.5)  # 50% faster attacks
+			"crit_chance":
+				player.add_crit_chance(0.20)  # 20% crit chance
+			"cooldown_reduction":
+				player.add_cooldown_reduction(0.25)  # 25% cooldown reduction
+			_:
+				push_warning("Unknown ability: " + ability_id)
+
+func _on_relic_chosen(relic_id: String) -> void:
+	"""Called when player chooses a relic at level 4."""
+	print("GameManager: Player chose relic: ", relic_id)
+	
+	# Apply the relic to the player (permanent upgrades)
+	if player:
+		match relic_id:
+			"double_jump":
+				player.grant_double_jump()
+			"dash":
+				player.grant_dash()
+			_:
+				push_warning("Unknown relic: " + relic_id)
 
 func _update_exp_display() -> void:
 	"""Update the EXP bar and labels."""
@@ -277,13 +310,12 @@ func should_spawn_dummy() -> bool:
 	return time_since_last_dummy_spawn >= DUMMY_SPAWN_INTERVAL or active_dummies.size() == 0
 
 func _spawn_new_dummy() -> void:
-	"""Spawn a new dummy at the next spawn location."""
+	"""Spawn a new dummy at a random spawn location."""
 	var new_dummy = Dummy.instantiate()
 	add_child(new_dummy)
 	
-	# Get spawn position (cycle through locations)
-	var spawn_pos = dummy_spawn_locations[next_dummy_spawn_index]
-	next_dummy_spawn_index = (next_dummy_spawn_index + 1) % dummy_spawn_locations.size()
+	# Get random spawn position
+	var spawn_pos = dummy_spawn_locations[randi() % dummy_spawn_locations.size()]
 	
 	new_dummy.global_position = spawn_pos
 	new_dummy.z_index = 1

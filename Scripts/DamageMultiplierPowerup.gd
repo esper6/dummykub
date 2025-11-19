@@ -8,6 +8,7 @@ extends Area2D
 
 var collected: bool = false
 var damage_multiplier: float = 1.3
+const DURATION: float = 15.0  # 15 second buff duration
 
 func _ready() -> void:
 	# Generate weighted random multiplier (1.3x to 2.1x)
@@ -107,11 +108,9 @@ func _collect(player: Node2D) -> void:
 	monitoring = false
 	monitorable = false
 	
-	# Apply damage multiplier to player
+	# Apply temporary damage multiplier to player
 	if player.has_method("add_damage_multiplier"):
-		player.add_damage_multiplier(damage_multiplier)
-	elif "damage_multiplier" in player:
-		player.damage_multiplier *= damage_multiplier
+		player.add_damage_multiplier(damage_multiplier, DURATION)
 	
 	_play_collection_effect()
 	

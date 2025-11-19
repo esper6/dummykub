@@ -1,10 +1,14 @@
-[gd_scene load_steps=4 format=3 uid="uid://bsw4bk0b2cr4"]
+[gd_scene load_steps=5 format=3 uid="uid://bsw4bk0b2cr4"]
 
 [ext_resource type="Script" uid="uid://bjhjwvmf2pymv" path="res://Scripts/ElementalImbue.gd" id="1_elem"]
 [ext_resource type="Texture2D" uid="uid://cpk565u4q35my" path="res://Assets/Sprites/Particles/magic_01.png" id="2_texture"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_powerup"]
 radius = 35.0
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_8561r"]
+particle_flag_disable_z = true
+gravity = Vector3(0, 98, 0)
 
 [node name="ElementalImbue" type="Area2D"]
 collision_layer = 16
@@ -39,5 +43,6 @@ amount = 20
 lifetime = 0.5
 one_shot = true
 explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_8561r")
 
 [connection signal="body_entered" from="." to="." method="_on_body_entered"]
