@@ -62,8 +62,8 @@ func _collect(player: Node2D) -> void:
 	collected = true
 	
 	# Disable collision to prevent multiple triggers
-	monitoring = false
-	monitorable = false
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
 	
 	# Grant double jump ability
 	if player.has_method("grant_double_jump"):

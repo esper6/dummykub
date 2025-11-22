@@ -127,4 +127,3 @@ func _play_collection_effect() -> void:
 	# Burst particles
 	if particles:
 		particles.emitting = true
-

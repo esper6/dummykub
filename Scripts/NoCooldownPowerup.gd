@@ -71,8 +71,8 @@ func _on_body_entered(body: Node2D) -> void:
 
 func _collect(player: Node2D) -> void:
 	collected = true
-	monitoring = false
-	monitorable = false
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
 	
 	# Apply no cooldown buff to player
 	if player.has_method("apply_no_cooldown"):

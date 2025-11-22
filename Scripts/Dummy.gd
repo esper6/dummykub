@@ -38,6 +38,9 @@ func _ready() -> void:
 		dummy_sprite.visible = true
 		if dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("idle"):
 			dummy_sprite.play("idle")
+	
+	# Notify companions that a dummy has spawned
+	EventBus.dummy_spawned.emit(self)
 
 func _process(delta: float) -> void:
 	if in_hitstop:
@@ -184,6 +187,9 @@ func _die(damage_type: String) -> void:
 	"""Handle dummy death with different animations based on damage type."""
 	is_dead = true
 	print("Dummy died from: ", damage_type)
+	
+	# Notify companions that dummy died (so they can immediately find new target)
+	EventBus.dummy_died.emit(self)
 	
 	# Stop all movement/hitstop
 	knockback_velocity = Vector2.ZERO

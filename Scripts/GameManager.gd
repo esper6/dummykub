@@ -20,6 +20,7 @@ extends Node2D
 @onready var level_up_screen: CanvasLayer = $LevelUpScreen
 @onready var ability_up_screen: CanvasLayer = $AbilityUpScreen
 @onready var relic_screen: CanvasLayer = $RelicScreen
+@onready var stat_up_screen: CanvasLayer = $StatUpScreen
 
 const GAME_DURATION: float = 60.0
 const POWERUP_SPAWN_INTERVAL: float = 5.0  # Spawn power-up every 5 seconds
@@ -89,6 +90,10 @@ func _ready() -> void:
 	if relic_screen:
 		relic_screen.relic_chosen.connect(_on_relic_chosen)
 	
+	# Connect stat up screen signal (for every level up)
+	if stat_up_screen:
+		stat_up_screen.stats_confirmed.connect(_on_stats_confirmed)
+	
 	# Track the initial dummy
 	if dummy:
 		active_dummies.append(dummy)
@@ -103,8 +108,12 @@ func _ready() -> void:
 	
 	game_over_panel.hide()
 	
-	# Show GO! animation before starting
-	_show_go_animation()
+	# Show skill selection at the beginning of the game
+	if level_up_screen:
+		level_up_screen.show_level_up()
+	else:
+		# If no skill selection, just show GO animation
+		_show_go_animation()
 
 func _process(delta: float) -> void:
 	if not game_active:
@@ -238,17 +247,9 @@ func _on_player_level_up(new_level: int) -> void:
 	print("GameManager: Player leveled up to ", new_level)
 	_update_exp_display()
 	
-	# Show level up screen at level 2 for skill selection
-	if new_level == 2 and level_up_screen:
-		level_up_screen.show_level_up()
-	
-	# Show ability screen at level 3 for ability selection
-	elif new_level == 3 and ability_up_screen:
-		ability_up_screen.show_ability_selection()
-	
-	# Show relic screen at level 4 for relic selection
-	elif new_level == 4 and relic_screen:
-		relic_screen.show_relic_selection()
+	# Show stat up screen at every level starting from level 2
+	if new_level >= 2 and stat_up_screen:
+		stat_up_screen.show_stat_selection(player)
 
 func _on_skill_chosen(skill_name: String) -> void:
 	"""Called when player chooses a skill from level up screen."""
@@ -257,6 +258,9 @@ func _on_skill_chosen(skill_name: String) -> void:
 	# Unlock the skill for the player
 	if player:
 		player.unlock_skill(skill_name)
+	
+	# After skill selection, show GO! animation and start the game
+	_show_go_animation()
 
 func _on_ability_chosen(ability_id: String) -> void:
 	"""Called when player chooses an ability from ability up screen."""
@@ -287,6 +291,23 @@ func _on_relic_chosen(relic_id: String) -> void:
 				player.grant_dash()
 			_:
 				push_warning("Unknown relic: " + relic_id)
+
+func _on_stats_confirmed(auto_stats: Array, manual_allocations: Dictionary) -> void:
+	"""Called when player confirms their stat allocation."""
+	print("GameManager: Stats confirmed - Auto: ", auto_stats, " Manual: ", manual_allocations)
+	
+	if not player:
+		return
+	
+	# Apply auto stats (+1 to each of the 3 random stats)
+	for stat_id in auto_stats:
+		player.increase_stat(stat_id, 1)
+	
+	# Apply manual allocations (player's 2 points)
+	for stat_id in manual_allocations:
+		player.increase_stat(stat_id, manual_allocations[stat_id])
+	
+	print("All stats applied to player")
 
 func _update_exp_display() -> void:
 	"""Update the EXP bar and labels."""
@@ -360,72 +381,15 @@ func _spawn_initial_dummies() -> void:
 	
 	print("Initial dummies spawned. Total active dummies: ", active_dummies.size())
 
-func _check_dummy_at_position(pos: Vector2, threshold: float = 80.0) -> bool:
-	"""Check if a dummy exists at the given position within threshold distance."""
-	for dummy in active_dummies:
-		if dummy and is_instance_valid(dummy):
-			if dummy.global_position.distance_to(pos) < threshold:
-				return true
-	return false
-
-func _get_offset_positions(base_pos: Vector2, offset_distance: float = 80.0) -> Dictionary:
-	"""Get the left, right, and center positions for a spawn location."""
-	var left_angle = deg_to_rad(-25)  # 25 degrees to the left
-	var right_angle = deg_to_rad(25)  # 25 degrees to the right
-	
-	var left_pos = base_pos + Vector2(cos(left_angle), sin(left_angle)) * offset_distance
-	var right_pos = base_pos + Vector2(cos(right_angle), sin(right_angle)) * offset_distance
-	
-	return {
-		"center": base_pos,
-		"left": left_pos,
-		"right": right_pos
-	}
-
 func _spawn_new_dummy() -> void:
-	"""Spawn a new dummy at a random spawn location with smart offset handling."""
+	"""Spawn a new dummy at a random spawn location."""
 	var new_dummy = Dummy.instantiate()
 	add_child(new_dummy)
 	
 	# Get random spawn position
-	var base_spawn_pos = dummy_spawn_locations[randi() % dummy_spawn_locations.size()]
+	var spawn_pos = dummy_spawn_locations[randi() % dummy_spawn_locations.size()]
 	
-	# Get all possible positions (center, left, right)
-	var positions = _get_offset_positions(base_spawn_pos)
-	
-	# Check which positions are available
-	var center_available = not _check_dummy_at_position(positions.center)
-	var left_available = not _check_dummy_at_position(positions.left)
-	var right_available = not _check_dummy_at_position(positions.right)
-	
-	var final_pos: Vector2
-	
-	# Prefer center if available
-	if center_available:
-		final_pos = positions.center
-		print("Spawned dummy at center position: ", final_pos)
-	elif left_available and right_available:
-		# Both sides available, randomly choose one
-		if randi() % 2 == 0:
-			final_pos = positions.left
-			print("Spawned dummy at left offset: ", final_pos)
-		else:
-			final_pos = positions.right
-			print("Spawned dummy at right offset: ", final_pos)
-	elif left_available:
-		# Only left available
-		final_pos = positions.left
-		print("Spawned dummy at left offset: ", final_pos)
-	elif right_available:
-		# Only right available
-		final_pos = positions.right
-		print("Spawned dummy at right offset: ", final_pos)
-	else:
-		# All positions taken, use center anyway (or could skip spawning)
-		final_pos = positions.center
-		print("All positions occupied, spawning at center: ", final_pos)
-	
-	new_dummy.global_position = final_pos
+	new_dummy.global_position = spawn_pos
 	new_dummy.z_index = 1
 	
 	# Track it
@@ -435,7 +399,7 @@ func _spawn_new_dummy() -> void:
 	# Reset spawn timer
 	time_since_last_dummy_spawn = 0.0
 	
-	print("Spawned new dummy at ", final_pos, " | Active dummies: ", active_dummies.size())
+	print("Spawned new dummy at ", spawn_pos, " | Active dummies: ", active_dummies.size())
 	
 	# Spawn animation - fade in
 	new_dummy.modulate.a = 0.0

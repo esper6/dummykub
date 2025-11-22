@@ -132,6 +132,28 @@ var cooldown_reduction: float = 0.0  # Percentage (0.0 to 1.0)
 var movement_speed_multiplier: float = 1.0  # Base speed multiplier
 var current_melee_element: String = "physical"  # Default to physical damage (for compatibility)
 
+# Stat system (11 stats, each point = +1 level)
+var physical_damage: int = 0
+var skill_damage: int = 0
+var speed: int = 0
+var companion: int = 0
+var crit_chance_stat: int = 0  # Separate from ability system crit_chance
+var crit_damage: int = 0
+var exp_gain: int = 0
+var cooldown_reduction_stat: int = 0  # Separate from ability system cooldown_reduction
+var attack_range: int = 0
+var luck: int = 0
+var jump_height: int = 0
+
+# Companion system
+const Companion = preload("res://Scenes/Companion.tscn")
+var active_companions: Array = []
+
+# Stat multipliers (calculated from stat values)
+var physical_damage_multiplier: float = 1.0
+var skill_damage_multiplier: float = 1.0
+var crit_damage_multiplier: float = 2.0  # Base crit damage is 2x
+
 # No cooldown buff system
 var no_cooldown_active: bool = false
 var no_cooldown_timer: float = 0.0
@@ -144,10 +166,13 @@ var attack_on_cooldown: bool = false
 func _ready() -> void:
 	combo_timer.wait_time = COMBO_WINDOW
 	weapon_hitbox.monitoring = false
-	# Set initial weapon position based on facing direction
-	weapon_hitbox.position.x = 70 if facing_right else -70
+	# Set initial weapon position based on facing direction (will be updated with attack range in _flip_character)
+	_flip_character(facing_right)
 	# Hide weapon visual (keep hitbox functional)
 	weapon_visual.visible = false
+	# Initialize companions if player already has companion stat
+	if companion > 0:
+		call_deferred("_update_companions")
 
 func _physics_process(delta: float) -> void:
 	if not game_active:
@@ -281,9 +306,11 @@ func _physics_process(delta: float) -> void:
 		
 		# Handle jump (ground jump + double jump)
 		elif Input.is_action_just_pressed("jump"):
+			# Apply jump height stat multiplier (+5% per point)
+			var jump_multiplier = 1.0 + (jump_height * 0.05)
 			if is_on_floor():
 				# First jump from ground - variable height
-				velocity.y = JUMP_VELOCITY
+				velocity.y = JUMP_VELOCITY * jump_multiplier
 				is_first_jump = true
 				jump_held_time = 0.0
 				current_jump_level = JumpLevel.FULL  # Default to full, will be set when cut
@@ -292,7 +319,7 @@ func _physics_process(delta: float) -> void:
 					has_double_jump = true
 			elif has_double_jump and double_jump_unlocked:
 				# Double jump in air - fixed height (use medium gravity for double jump)
-				velocity.y = DOUBLE_JUMP_VELOCITY
+				velocity.y = DOUBLE_JUMP_VELOCITY * jump_multiplier
 				is_first_jump = false
 				current_jump_level = JumpLevel.MEDIUM  # Double jump uses medium gravity
 				has_double_jump = false  # Used up the double jump
@@ -347,8 +374,10 @@ func _physics_process(delta: float) -> void:
 			velocity.x = dash_direction * current_dash_speed
 		else:
 			var direction = Input.get_axis("move_left", "move_right")
+			# Apply speed stat multiplier (+5% per point)
+			var speed_multiplier = 1.0 + (speed * 0.05)
 			if direction != 0:
-				var current_speed = MOVE_SPEED * movement_speed_multiplier
+				var current_speed = MOVE_SPEED * movement_speed_multiplier * speed_multiplier
 				velocity.x = direction * current_speed
 				# Flip character to face movement direction
 				if direction > 0 and not facing_right:
@@ -356,7 +385,7 @@ func _physics_process(delta: float) -> void:
 				elif direction < 0 and facing_right:
 					_flip_character(false)
 			else:
-				var current_speed = MOVE_SPEED * movement_speed_multiplier
+				var current_speed = MOVE_SPEED * movement_speed_multiplier * speed_multiplier
 				velocity.x = move_toward(velocity.x, 0, current_speed * delta * 5.0)
 		
 		# Move character
@@ -398,8 +427,10 @@ func _physics_process(delta: float) -> void:
 func _flip_character(right: bool) -> void:
 	facing_right = right
 	visual_root.scale.x = 1.0 if right else -1.0
-	# Flip weapon hitbox position
-	weapon_hitbox.position.x = 70 if right else -70
+	# Flip weapon hitbox position (apply attack range multiplier)
+	var range_multiplier = 1.0 + (attack_range * 0.05)
+	var base_offset = 70.0 * range_multiplier
+	weapon_hitbox.position.x = base_offset if right else -base_offset
 
 func _input(event: InputEvent) -> void:
 	if not game_active or in_hitstop:
@@ -570,14 +601,14 @@ func _on_weapon_hitbox_area_entered(area: Area2D) -> void:
 	
 	# Deal damage directly to the enemy
 	if enemy.has_method("take_damage"):
-		# Apply player's damage multiplier, plus god mode bonus if active
+		# Apply player's damage multiplier, physical damage stat, plus god mode bonus if active
 		var god_mode_bonus = 100.0 if DebugSettings.god_mode else 1.0
-		var actual_damage = int(current_attack_damage * damage_multiplier * god_mode_bonus)
+		var actual_damage = int(current_attack_damage * damage_multiplier * physical_damage_multiplier * god_mode_bonus)
 		
-		# Roll for critical hit (2x damage)
+		# Roll for critical hit (uses crit_damage_multiplier)
 		var is_crit = _roll_crit()
 		if is_crit:
-			actual_damage *= 2
+			actual_damage = int(actual_damage * crit_damage_multiplier)
 			crit_hit.emit(actual_damage)
 			print("CRITICAL HIT! ", actual_damage, " damage!")
 		
@@ -679,11 +710,11 @@ func _cast_thunderbolt() -> void:
 		direction = Vector2.RIGHT if facing_right else Vector2.LEFT
 	
 	# Setup the projectile
-	# Apply player's damage multiplier, plus god mode bonus if active
+	# Apply player's damage multiplier, skill damage stat, plus god mode bonus if active
 	var god_mode_bonus = 100.0 if DebugSettings.god_mode else 1.0
 	var base_damage = 100  # Base 100 total = 10 per tick over 10 ticks
 	# Ensure multiplier is at least 1.0 (safety check)
-	var actual_multiplier = max(1.0, damage_multiplier)
+	var actual_multiplier = max(1.0, damage_multiplier) * skill_damage_multiplier
 	var damage = int(base_damage * actual_multiplier * god_mode_bonus)
 	print("Thunderbolt damage calculation: base=%d, multiplier=%.2fx, final=%d" % [base_damage, actual_multiplier, damage])
 	thunderbolt.setup(direction, damage)
@@ -696,7 +727,10 @@ func _cast_thunderbolt() -> void:
 	_screen_shake(3.0, 0.1)
 	
 	# Start cooldown with reduction applied (only emit UI signal if not in no cooldown mode)
-	var actual_cooldown = SKILL_COOLDOWN_TIME * (1.0 - cooldown_reduction)
+	# Combine ability system cooldown_reduction with stat cooldown_reduction_stat (+2% per point)
+	var total_cd_reduction = cooldown_reduction + (cooldown_reduction_stat * 0.02)
+	total_cd_reduction = clamp(total_cd_reduction, 0.0, 0.8)  # Cap at 80%
+	var actual_cooldown = SKILL_COOLDOWN_TIME * (1.0 - total_cd_reduction)
 	skill_cooldown = actual_cooldown
 	if not no_cooldown_active:
 		skill_cooldown_started.emit(actual_cooldown)
@@ -724,9 +758,9 @@ func _cast_fireball() -> void:
 		direction = Vector2.RIGHT if facing_right else Vector2.LEFT
 	
 	# Setup the projectile
-	# Apply player's damage multiplier, plus god mode bonus if active
+	# Apply player's damage multiplier, skill damage stat, plus god mode bonus if active
 	var god_mode_bonus = 100.0 if DebugSettings.god_mode else 1.0
-	var damage = int(50 * damage_multiplier * god_mode_bonus)
+	var damage = int(50 * damage_multiplier * skill_damage_multiplier * god_mode_bonus)
 	fireball.setup(direction, damage)
 	
 	# Apply recoil (opposite direction of projectile)
@@ -737,7 +771,10 @@ func _cast_fireball() -> void:
 	_screen_shake(3.0, 0.1)
 	
 	# Start cooldown with reduction applied (only emit UI signal if not in no cooldown mode)
-	var actual_cooldown = SKILL_COOLDOWN_TIME * (1.0 - cooldown_reduction)
+	# Combine ability system cooldown_reduction with stat cooldown_reduction_stat (+2% per point)
+	var total_cd_reduction = cooldown_reduction + (cooldown_reduction_stat * 0.02)
+	total_cd_reduction = clamp(total_cd_reduction, 0.0, 0.8)  # Cap at 80%
+	var actual_cooldown = SKILL_COOLDOWN_TIME * (1.0 - total_cd_reduction)
 	skill_cooldown = actual_cooldown
 	if not no_cooldown_active:
 		skill_cooldown_started.emit(actual_cooldown)
@@ -751,9 +788,9 @@ func _cast_icelance() -> void:
 	icelance.global_position = global_position
 	
 	# Setup the nova (direction doesn't matter for AOE)
-	# Apply player's damage multiplier, plus god mode bonus if active
+	# Apply player's damage multiplier, skill damage stat, plus god mode bonus if active
 	var god_mode_bonus = 100.0 if DebugSettings.god_mode else 1.0
-	var damage = int(50 * damage_multiplier * god_mode_bonus)
+	var damage = int(50 * damage_multiplier * skill_damage_multiplier * god_mode_bonus)
 	icelance.setup(Vector2.ZERO, damage)  # No direction needed
 	
 	# No recoil for AOE nova (stays centered on player)
@@ -762,7 +799,10 @@ func _cast_icelance() -> void:
 	_screen_shake(3.0, 0.1)
 	
 	# Start cooldown with reduction applied (only emit UI signal if not in no cooldown mode)
-	var actual_cooldown = SKILL_COOLDOWN_TIME * (1.0 - cooldown_reduction)
+	# Combine ability system cooldown_reduction with stat cooldown_reduction_stat (+2% per point)
+	var total_cd_reduction = cooldown_reduction + (cooldown_reduction_stat * 0.02)
+	total_cd_reduction = clamp(total_cd_reduction, 0.0, 0.8)  # Cap at 80%
+	var actual_cooldown = SKILL_COOLDOWN_TIME * (1.0 - total_cd_reduction)
 	skill_cooldown = actual_cooldown
 	if not no_cooldown_active:
 		skill_cooldown_started.emit(actual_cooldown)
@@ -776,8 +816,10 @@ func unlock_skill(skill_name: String) -> void:
 func _start_attack_cooldown() -> void:
 	"""Start the attack cooldown after full combo."""
 	attack_on_cooldown = true
-	# Apply cooldown reduction
-	var actual_cooldown = ATTACK_COOLDOWN_TIME * (1.0 - cooldown_reduction)
+	# Apply cooldown reduction (combine ability system with stat)
+	var total_cd_reduction = cooldown_reduction + (cooldown_reduction_stat * 0.02)
+	total_cd_reduction = clamp(total_cd_reduction, 0.0, 0.8)  # Cap at 80%
+	var actual_cooldown = ATTACK_COOLDOWN_TIME * (1.0 - total_cd_reduction)
 	attack_cooldown = actual_cooldown
 	# Only emit UI signal if not in no cooldown mode
 	if not no_cooldown_active:
@@ -896,13 +938,19 @@ func add_cooldown_reduction(amount: float) -> void:
 
 func _roll_crit() -> bool:
 	"""Roll for critical hit. Returns true if crit."""
-	return randf() < crit_chance
+	# Combine ability system crit_chance with stat crit_chance_stat
+	var total_crit_chance = crit_chance + (crit_chance_stat * 0.02)  # +2% per stat point
+	total_crit_chance = clamp(total_crit_chance, 0.0, 1.0)  # Cap at 100%
+	return randf() < total_crit_chance
 
 func gain_exp(amount: int) -> void:
 	"""Gain experience points and handle leveling up."""
-	current_exp += amount
-	exp_gained.emit(amount)
-	print("Gained ", amount, " EXP! (", current_exp, "/", exp_to_next_level, ")")
+	# Apply exp gain multiplier from stat
+	var exp_multiplier = 1.0 + (exp_gain * 0.1)  # +10% per point
+	var actual_amount = int(amount * exp_multiplier)
+	current_exp += actual_amount
+	exp_gained.emit(actual_amount)
+	print("Gained ", actual_amount, " EXP! (", current_exp, "/", exp_to_next_level, ")")
 	
 	# Check for level up
 	while current_exp >= exp_to_next_level:
@@ -961,3 +1009,148 @@ func game_over() -> void:
 	can_input = false
 	weapon_hitbox.monitoring = false
 	weapon_visual.visible = false
+	
+	# Clean up companions
+	for companion_instance in active_companions:
+		if is_instance_valid(companion_instance):
+			companion_instance.queue_free()
+	active_companions.clear()
+
+# === Stat System Methods ===
+
+func increase_stat(stat_id: String, amount: int) -> void:
+	"""Increase a stat by the given amount and apply its effects."""
+	match stat_id:
+		"physical_damage":
+			physical_damage += amount
+			_apply_physical_damage_stat()
+		"skill_damage":
+			skill_damage += amount
+			_apply_skill_damage_stat()
+		"speed":
+			speed += amount
+			# Speed is applied in _physics_process, no need to recalculate here
+		"companion":
+			companion += amount
+			_update_companions()
+		"crit_chance":
+			crit_chance_stat += amount
+			# Crit chance is calculated in _roll_crit()
+		"crit_damage":
+			crit_damage += amount
+			_apply_crit_damage_stat()
+		"exp_gain":
+			exp_gain += amount
+			# EXP gain is applied in gain_exp()
+		"cooldown_reduction":
+			cooldown_reduction_stat += amount
+			# Cooldown reduction is applied in cooldown calculations
+		"attack_range":
+			attack_range += amount
+			_apply_attack_range_stat()
+		"luck":
+			luck += amount
+			# Luck is used in GameManager for power-up spawning
+		"jump_height":
+			jump_height += amount
+			# Jump height is applied in jump calculations
+		_:
+			push_warning("Unknown stat: " + stat_id)
+	
+	print("Stat increased: ", stat_id, " by ", amount, " (total: ", get_stat_value(stat_id), ")")
+
+func get_stat_value(stat_id: String) -> int:
+	"""Get the current value of a stat."""
+	match stat_id:
+		"physical_damage":
+			return physical_damage
+		"skill_damage":
+			return skill_damage
+		"speed":
+			return speed
+		"companion":
+			return companion
+		"crit_chance":
+			return crit_chance_stat
+		"crit_damage":
+			return crit_damage
+		"exp_gain":
+			return exp_gain
+		"cooldown_reduction":
+			return cooldown_reduction_stat
+		"attack_range":
+			return attack_range
+		"luck":
+			return luck
+		"jump_height":
+			return jump_height
+		_:
+			push_warning("Unknown stat: " + stat_id)
+			return 0
+
+func _apply_physical_damage_stat() -> void:
+	"""Apply physical damage stat to multiplier."""
+	# +10% per point
+	physical_damage_multiplier = 1.0 + (physical_damage * 0.1)
+	print("Physical damage multiplier: %.2fx" % physical_damage_multiplier)
+
+func _apply_skill_damage_stat() -> void:
+	"""Apply skill damage stat to multiplier."""
+	# +10% per point
+	skill_damage_multiplier = 1.0 + (skill_damage * 0.1)
+	print("Skill damage multiplier: %.2fx" % skill_damage_multiplier)
+
+func _apply_crit_damage_stat() -> void:
+	"""Apply crit damage stat to multiplier."""
+	# Base is 2.0x, +0.2x per point
+	crit_damage_multiplier = 2.0 + (crit_damage * 0.2)
+	print("Crit damage multiplier: %.2fx" % crit_damage_multiplier)
+
+func _apply_attack_range_stat() -> void:
+	"""Apply attack range stat to weapon hitbox size."""
+	# +5% per point to hitbox size
+	var range_multiplier = 1.0 + (attack_range * 0.05)
+	# Update hitbox position (will be applied when facing changes via _flip_character)
+	# Note: This is a simplified approach - you might want to scale the collision shape instead
+	print("Attack range multiplier: %.2fx" % range_multiplier)
+
+func _update_companions() -> void:
+	"""Update companion count based on companion stat."""
+	var target_count = companion
+	
+	# Remove excess companions
+	while active_companions.size() > target_count:
+		var companion_instance = active_companions.pop_back()
+		if is_instance_valid(companion_instance):
+			companion_instance.queue_free()
+	
+	# Spawn new companions if needed
+	while active_companions.size() < target_count:
+		_spawn_companion()
+
+func _spawn_companion() -> void:
+	"""Spawn a new companion."""
+	var companion_instance = Companion.instantiate()
+	get_parent().add_child(companion_instance)
+	
+	# Position near player with some offset
+	var spawn_offset = Vector2(randf_range(-50, 50), randf_range(-30, 30))
+	companion_instance.global_position = global_position + spawn_offset
+	companion_instance.z_index = 1  # Same z_index as player
+	
+	# Set player reference
+	companion_instance.player = self
+	
+	# Track companion
+	active_companions.append(companion_instance)
+	
+	# Spawn animation
+	companion_instance.modulate.a = 0.0
+	companion_instance.scale = Vector2(0.5, 0.5)
+	
+	var spawn_tween = create_tween()
+	spawn_tween.set_parallel(true)
+	spawn_tween.tween_property(companion_instance, "modulate:a", 1.0, 0.5)
+	spawn_tween.tween_property(companion_instance, "scale", Vector2.ONE, 0.5).set_ease(Tween.EASE_OUT)
+	
+	print("Companion spawned! Total companions: ", active_companions.size())

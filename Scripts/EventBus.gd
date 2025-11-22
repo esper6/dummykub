@@ -76,3 +76,9 @@ signal game_ended(total_damage: int, total_hits: int)
 ## Emitted when a combo is performed
 signal combo_performed(combo_count: int)
 
+## Emitted when a dummy spawns
+signal dummy_spawned(dummy: Node2D)
+
+## Emitted when a dummy dies
+signal dummy_died(dummy: Node2D)
+

@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=4 uid="uid://d2ak5p6ml1vwf"]
+[gd_scene load_steps=17 format=4 uid="uid://d2ak5p6ml1vwf"]
 
 [ext_resource type="Script" uid="uid://crye6d3lha3pj" path="res://Scripts/GameManager.gd" id="1_gamemanager"]
 [ext_resource type="PackedScene" uid="uid://csgk5qd7oe8pb" path="res://Scenes/Player.tscn" id="2_player"]
@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://dg4w8pt71a2p3" path="res://Assets/Tilesets/tilemap.png" id="5_7lihs"]
 [ext_resource type="PackedScene" path="res://Scenes/AbilityUpScreen.tscn" id="6_bf53h"]
 [ext_resource type="PackedScene" path="res://Scenes/RelicScreen.tscn" id="6_relic"]
+[ext_resource type="PackedScene" path="res://Scenes/StatUpScreen.tscn" id="6_statup"]
 [ext_resource type="PackedScene" uid="uid://brgtjw7w5vr05" path="res://Scenes/UIManager.tscn" id="7_uimanager"]
 [ext_resource type="PackedScene" uid="uid://bk3h5y8n7qw4m" path="res://Scenes/PauseMenu.tscn" id="8_pausemenu"]
 [ext_resource type="Script" uid="uid://dyl4htwes8m34" path="res://Scripts/LevelUpScreen.gd" id="9_levelup"]
@@ -4830,6 +4831,8 @@ shape = SubResource("RectangleShape2D_wall")
 [node name="AbilityUpScreen" parent="." instance=ExtResource("6_bf53h")]
 
 [node name="RelicScreen" parent="." instance=ExtResource("6_relic")]
+
+[node name="StatUpScreen" parent="." instance=ExtResource("6_statup")]
 
 [node name="LevelUpScreen" type="CanvasLayer" parent="."]
 process_mode = 3

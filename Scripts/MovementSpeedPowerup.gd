@@ -109,8 +109,8 @@ func _on_body_entered(body: Node2D) -> void:
 
 func _collect(player: Node2D) -> void:
 	collected = true
-	monitoring = false
-	monitorable = false
+	set_deferred("monitoring", false)
+	set_deferred("monitorable", false)
 	
 	# Apply permanent movement speed boost to player
 	if player.has_method("apply_movement_speed_boost"):
@@ -132,4 +132,3 @@ func _play_collection_effect() -> void:
 	# Burst particles
 	if particles:
 		particles.emitting = true
-

@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3 uid="uid://companion_dog"]
+
+[ext_resource type="Script" path="res://Scripts/Companion.gd" id="1_companion"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_companion"]
+size = Vector2(30, 40)
+
+[node name="Companion" type="CharacterBody2D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_companion")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -10)
+shape = SubResource("RectangleShape2D_companion")
+
+[node name="VisualRoot" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="Sprite2D" type="Sprite2D" parent="VisualRoot"]
+
