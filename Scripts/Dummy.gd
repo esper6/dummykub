@@ -23,6 +23,7 @@ const RETURN_SPEED: float = 8.0
 # Damage number scene
 const DamageNumber = preload("res://Scenes/DamageNumber.tscn")
 const ImpactParticles = preload("res://Scenes/ImpactParticles.tscn")
+const ExpOrb = preload("res://Scenes/ExpOrb.tscn")
 
 func _ready() -> void:
 	base_position = visual_root.position
@@ -206,20 +207,33 @@ func _die(damage_type: String) -> void:
 			_play_death_animation_physical()
 
 func _grant_exp_to_player() -> void:
-	"""Grant EXP to the player when this dummy dies."""
+	"""Spawn EXP orbs that will fly to the EXP bar and grant EXP."""
 	const EXP_REWARD: int = 35
+	const ORB_COUNT: int = 3  # Spawn 3 orbs per kill
 	
-	# Find the player in the scene
-	var player = get_tree().get_first_node_in_group("player")
-	if not player:
-		# Try getting by name
-		player = get_parent().get_node_or_null("Player")
+	# Calculate EXP per orb (make sure total adds up)
+	var exp_per_orb = EXP_REWARD / ORB_COUNT
+	var remainder = EXP_REWARD % ORB_COUNT
 	
-	if player and player.has_method("gain_exp"):
-		player.gain_exp(EXP_REWARD)
-		print("Granted ", EXP_REWARD, " EXP to player")
-	else:
-		print("Could not find player to grant EXP")
+	# Spawn multiple orbs for visual effect
+	for i in range(ORB_COUNT):
+		var orb = ExpOrb.instantiate()
+		get_parent().add_child(orb)
+		
+		# Position at dummy location with slight random offset
+		var offset = Vector2(randf_range(-20, 20), randf_range(-30, -10))
+		orb.global_position = global_position + offset
+		
+		# Give remainder to last orb to ensure total is correct
+		if i == ORB_COUNT - 1:
+			orb.exp_amount = exp_per_orb + remainder
+		else:
+			orb.exp_amount = exp_per_orb
+		
+		orb.z_index = 10  # Above most things
+		
+		# Stagger the float start slightly for visual variety
+		orb.float_time = i * 0.1
 
 func _play_death_animation_physical() -> void:
 	"""Death animation for physical attacks (punch, kick, uppercut)."""

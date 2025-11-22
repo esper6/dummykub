@@ -21,8 +21,8 @@ shape = SubResource("CircleShape2D_powerup")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 modulate = Color(0, 1, 0.5, 1)
-position = Vector2(-1, 1)
-scale = Vector2(0.8105469, 0.8105469)
+position = Vector2(-3.8146973e-06, -2.0000038)
+scale = Vector2(0.22607422, 0.22607422)
 texture = ExtResource("2_texture")
 
 [node name="Label" type="Label" parent="."]

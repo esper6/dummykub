@@ -22,13 +22,13 @@ extends Node2D
 @onready var relic_screen: CanvasLayer = $RelicScreen
 
 const GAME_DURATION: float = 60.0
-const POWERUP_SPAWN_INTERVAL: float = 10.0  # Spawn power-up every 10 seconds
+const POWERUP_SPAWN_INTERVAL: float = 5.0  # Spawn power-up every 5 seconds
 const DUMMY_SPAWN_INTERVAL: float = 10.0  # Spawn dummy every 10 seconds
-const MAX_DUMMIES: int = 3  # Maximum dummies at once
+const MAX_DUMMIES: int = 10  # Maximum dummies at once (increased to allow all spawn locations)
 
 # Power-ups (Double Jump removed - now a relic)
 const DamageMultiplierPowerup = preload("res://Scenes/DamageMultiplierPowerup.tscn")
-const ElementalImbue = preload("res://Scenes/ElementalImbue.tscn")
+const MovementSpeedPowerup = preload("res://Scenes/MovementSpeedPowerup.tscn")
 const NoCooldownPowerup = preload("res://Scenes/NoCooldownPowerup.tscn")
 const Dummy = preload("res://Scenes/Dummy.tscn")
 
@@ -43,7 +43,7 @@ var game_active: bool = false  # Start inactive until GO! animation finishes
 # Dummy spawning system
 var active_dummies: Array = []
 var time_since_last_dummy_spawn: float = 0.0
-var dummy_spawn_locations: Array = [
+@export var dummy_spawn_locations: Array[Vector2] = [
 	Vector2(600, 800),   # Left side
 	Vector2(900, 700),   # Center upper
 	Vector2(1500, 750),  # Far right
@@ -64,6 +64,9 @@ var powerup_spawn_locations: Array = [
 ]
 
 func _ready() -> void:
+	# Add to group for easy finding
+	add_to_group("game_manager")
+	
 	# Connect UI Manager to player cooldowns
 	if ui_manager and player:
 		ui_manager.setup_player_connections(player)
@@ -91,6 +94,9 @@ func _ready() -> void:
 		active_dummies.append(dummy)
 		dummy.tree_exited.connect(_on_dummy_died.bind(dummy))
 		print("Initial dummy tracked. Active dummies: ", active_dummies.size())
+	
+	# Spawn dummies at all valid spawn locations at the start
+	_spawn_initial_dummies()
 	
 	# Initialize EXP display
 	_update_exp_display()
@@ -192,7 +198,7 @@ func _spawn_random_powerup() -> void:
 	if powerup_pool.is_empty():
 		powerup_pool = [
 			DamageMultiplierPowerup,
-			ElementalImbue,
+			MovementSpeedPowerup,
 			NoCooldownPowerup
 		]
 	
@@ -309,15 +315,117 @@ func should_spawn_dummy() -> bool:
 	# Spawn if timer reached OR all dummies are dead
 	return time_since_last_dummy_spawn >= DUMMY_SPAWN_INTERVAL or active_dummies.size() == 0
 
+func _spawn_initial_dummies() -> void:
+	"""Spawn dummies at all valid spawn locations at the start of the level."""
+	# Get all spawn locations that don't already have a dummy
+	var used_locations: Array = []
+	
+	# Check which locations are already occupied by the initial dummy
+	if dummy:
+		for loc in dummy_spawn_locations:
+			if dummy.global_position.distance_to(loc) < 50:  # Close enough to consider occupied
+				used_locations.append(loc)
+				break
+	
+	# Spawn a dummy at each unused spawn location
+	for spawn_pos in dummy_spawn_locations:
+		# Skip if this location is already occupied
+		var is_occupied = false
+		for used_loc in used_locations:
+			if spawn_pos.distance_to(used_loc) < 50:
+				is_occupied = true
+				break
+		
+		if not is_occupied:
+			var new_dummy = Dummy.instantiate()
+			add_child(new_dummy)
+			
+			new_dummy.global_position = spawn_pos
+			new_dummy.z_index = 1
+			
+			# Track it
+			active_dummies.append(new_dummy)
+			new_dummy.tree_exited.connect(_on_dummy_died.bind(new_dummy))
+			
+			# Spawn animation - fade in
+			new_dummy.modulate.a = 0.0
+			new_dummy.scale = Vector2(0.5, 0.5)
+			
+			var spawn_tween = create_tween()
+			spawn_tween.set_parallel(true)
+			spawn_tween.tween_property(new_dummy, "modulate:a", 1.0, 0.5)
+			spawn_tween.tween_property(new_dummy, "scale", Vector2.ONE, 0.5).set_ease(Tween.EASE_OUT)
+			
+			print("Spawned initial dummy at ", spawn_pos)
+	
+	print("Initial dummies spawned. Total active dummies: ", active_dummies.size())
+
+func _check_dummy_at_position(pos: Vector2, threshold: float = 80.0) -> bool:
+	"""Check if a dummy exists at the given position within threshold distance."""
+	for dummy in active_dummies:
+		if dummy and is_instance_valid(dummy):
+			if dummy.global_position.distance_to(pos) < threshold:
+				return true
+	return false
+
+func _get_offset_positions(base_pos: Vector2, offset_distance: float = 80.0) -> Dictionary:
+	"""Get the left, right, and center positions for a spawn location."""
+	var left_angle = deg_to_rad(-25)  # 25 degrees to the left
+	var right_angle = deg_to_rad(25)  # 25 degrees to the right
+	
+	var left_pos = base_pos + Vector2(cos(left_angle), sin(left_angle)) * offset_distance
+	var right_pos = base_pos + Vector2(cos(right_angle), sin(right_angle)) * offset_distance
+	
+	return {
+		"center": base_pos,
+		"left": left_pos,
+		"right": right_pos
+	}
+
 func _spawn_new_dummy() -> void:
-	"""Spawn a new dummy at a random spawn location."""
+	"""Spawn a new dummy at a random spawn location with smart offset handling."""
 	var new_dummy = Dummy.instantiate()
 	add_child(new_dummy)
 	
 	# Get random spawn position
-	var spawn_pos = dummy_spawn_locations[randi() % dummy_spawn_locations.size()]
+	var base_spawn_pos = dummy_spawn_locations[randi() % dummy_spawn_locations.size()]
 	
-	new_dummy.global_position = spawn_pos
+	# Get all possible positions (center, left, right)
+	var positions = _get_offset_positions(base_spawn_pos)
+	
+	# Check which positions are available
+	var center_available = not _check_dummy_at_position(positions.center)
+	var left_available = not _check_dummy_at_position(positions.left)
+	var right_available = not _check_dummy_at_position(positions.right)
+	
+	var final_pos: Vector2
+	
+	# Prefer center if available
+	if center_available:
+		final_pos = positions.center
+		print("Spawned dummy at center position: ", final_pos)
+	elif left_available and right_available:
+		# Both sides available, randomly choose one
+		if randi() % 2 == 0:
+			final_pos = positions.left
+			print("Spawned dummy at left offset: ", final_pos)
+		else:
+			final_pos = positions.right
+			print("Spawned dummy at right offset: ", final_pos)
+	elif left_available:
+		# Only left available
+		final_pos = positions.left
+		print("Spawned dummy at left offset: ", final_pos)
+	elif right_available:
+		# Only right available
+		final_pos = positions.right
+		print("Spawned dummy at right offset: ", final_pos)
+	else:
+		# All positions taken, use center anyway (or could skip spawning)
+		final_pos = positions.center
+		print("All positions occupied, spawning at center: ", final_pos)
+	
+	new_dummy.global_position = final_pos
 	new_dummy.z_index = 1
 	
 	# Track it
@@ -327,7 +435,7 @@ func _spawn_new_dummy() -> void:
 	# Reset spawn timer
 	time_since_last_dummy_spawn = 0.0
 	
-	print("Spawned new dummy at ", spawn_pos, " | Active dummies: ", active_dummies.size())
+	print("Spawned new dummy at ", final_pos, " | Active dummies: ", active_dummies.size())
 	
 	# Spawn animation - fade in
 	new_dummy.modulate.a = 0.0

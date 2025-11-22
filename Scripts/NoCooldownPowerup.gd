@@ -55,11 +55,12 @@ func _play_idle_animation() -> void:
 	glow_tween.tween_property(sprite, "modulate:a", 0.6, 0.2)
 	glow_tween.tween_property(sprite, "modulate:a", 1.0, 0.2)
 	
-	# Scale pulse
+	# Scale pulse (use base scale, not absolute values)
+	var base_scale = sprite.scale
 	var scale_tween = create_tween()
 	scale_tween.set_loops()
-	scale_tween.tween_property(sprite, "scale", Vector2(1.2, 1.2), 0.25)
-	scale_tween.tween_property(sprite, "scale", Vector2(1.0, 1.0), 0.25)
+	scale_tween.tween_property(sprite, "scale", base_scale * 1.2, 0.25)
+	scale_tween.tween_property(sprite, "scale", base_scale, 0.25)
 
 func _on_body_entered(body: Node2D) -> void:
 	if collected:
@@ -83,10 +84,11 @@ func _collect(player: Node2D) -> void:
 	queue_free()
 
 func _play_collection_effect() -> void:
-	# Flash and scale up rapidly
+	# Flash and scale up rapidly (use base scale, not absolute values)
+	var base_scale = sprite.scale
 	var collect_tween = create_tween()
 	collect_tween.set_parallel(true)
-	collect_tween.tween_property(sprite, "scale", Vector2(3.0, 3.0), 0.2)
+	collect_tween.tween_property(sprite, "scale", base_scale * 3.0, 0.2)
 	collect_tween.tween_property(sprite, "modulate:a", 0.0, 0.2)
 	collect_tween.tween_property(label, "modulate:a", 0.0, 0.2)
 	

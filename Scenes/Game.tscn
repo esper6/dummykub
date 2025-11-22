@@ -4783,6 +4783,7 @@ sources/1 = SubResource("TileSetAtlasSource_2irst")
 [node name="Game" type="Node2D"]
 y_sort_enabled = true
 script = ExtResource("1_gamemanager")
+dummy_spawn_locations = Array[Vector2]([Vector2(600, 1000), Vector2(900, 900), Vector2(1500, 950), Vector2(400, 950), Vector2(1200, 1000)])
 
 [node name="Background" type="ColorRect" parent="."]
 visible = false

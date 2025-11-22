@@ -103,8 +103,47 @@ func _on_powerup_collected(powerup_type: String, is_temporary: bool, duration: f
 	if powerup_type in active_powerups:
 		var existing_icon = active_powerups[powerup_type]
 		
-		# For temporary power-ups, refresh the icon
-		if is_temporary:
+		# Special handling for damage_multiplier - permanent, stack multiplicatively
+		if powerup_type == "damage_multiplier" and not is_temporary:
+			var is_stack = extra_data.get("is_stack", false)
+			if is_stack:
+				# Update existing icon with new combined multiplier
+				existing_icon.update_stack(extra_data)
+				print("UI: Updated damage multiplier icon with stacked value: %.1fx" % extra_data.get("multiplier", 1.0))
+				return
+			else:
+				# First multiplier, but icon already exists (shouldn't happen, but handle it)
+				existing_icon.queue_free()
+				active_powerups.erase(powerup_type)
+		# Special handling for no_cooldown - stack by adding duration
+		elif powerup_type == "no_cooldown" and is_temporary:
+			var is_stack = extra_data.get("is_stack", false)
+			print("UI: no_cooldown collected, is_stack=%s, existing icon found, duration=%.1f" % [is_stack, duration])
+			# If icon exists and we have a duration, always update it (stacking or refreshing)
+			if is_stack or duration > 0:
+				# Update existing icon with new total duration
+				existing_icon.update_timer(duration)
+				print("UI: Updated no cooldown icon with duration: %.1f seconds" % duration)
+				return
+			else:
+				# Edge case: icon exists but something went wrong - refresh it
+				print("UI: no_cooldown icon exists but duration invalid - refreshing")
+				existing_icon.queue_free()
+				active_powerups.erase(powerup_type)
+		# Special handling for movement_speed - permanent, uses higher multiplier
+		elif powerup_type == "movement_speed" and not is_temporary:
+			var is_stack = extra_data.get("is_stack", false)
+			if is_stack:
+				# Update existing icon with new multiplier
+				existing_icon.update_stack(extra_data)
+				print("UI: Updated movement speed icon with stacked value: %.1fx speed" % extra_data.get("multiplier", 1.0))
+				return
+			else:
+				# First movement_speed, but icon already exists (shouldn't happen, but handle it)
+				existing_icon.queue_free()
+				active_powerups.erase(powerup_type)
+		# For other temporary power-ups, refresh the icon
+		elif is_temporary:
 			existing_icon.queue_free()
 			active_powerups.erase(powerup_type)
 		# For permanent power-ups, just keep the existing icon

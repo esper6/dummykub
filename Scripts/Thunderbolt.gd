@@ -104,7 +104,11 @@ func setup(direction: Vector2, projectile_damage: int = 50) -> void:
 	"""Setup projectile with DoT damage calculation."""
 	super.setup(direction, projectile_damage)
 	# Calculate damage per tick to match total damage over TOTAL_TICKS
-	damage_per_tick = max(10, int(float(damage) / float(TOTAL_TICKS)))
+	# Remove the max(10, ...) cap so multipliers work correctly
+	damage_per_tick = int(float(damage) / float(TOTAL_TICKS))
+	# Ensure at least 1 damage per tick (safety check)
+	damage_per_tick = max(1, damage_per_tick)
+	print("Thunderbolt setup: total_damage=%d, damage_per_tick=%d (over %d ticks)" % [damage, damage_per_tick, TOTAL_TICKS])
 
 func _physics_process(delta: float) -> void:
 	"""Override: Stop movement when attached to target."""

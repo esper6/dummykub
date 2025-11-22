@@ -45,6 +45,19 @@ const JUMP_SHORT_THRESHOLD: float = 0.1  # Release before this = shortest jump
 const JUMP_MEDIUM_THRESHOLD: float = 0.2  # Release before this = medium jump
 const JUMP_LONG_THRESHOLD: float = 0.35  # Release before this = long jump (full = no release)
 
+# Variable gravity based on jump height (shorter = snappier)
+const GRAVITY_SHORT: float = 3500.0  # Very snappy for short hops
+const GRAVITY_MEDIUM: float = 2800.0  # Medium snappy
+const GRAVITY_LONG: float = 2400.0  # Less snappy
+const GRAVITY_FULL: float = 2200.0  # Floaty for full hops (base gravity)
+const FALL_GRAVITY_SHORT: float = 4000.0  # Fast fall for short hops
+const FALL_GRAVITY_MEDIUM: float = 3200.0  # Medium fall
+const FALL_GRAVITY_LONG: float = 3000.0  # Less fast fall
+const FALL_GRAVITY_FULL: float = 2800.0  # Normal fall for full hops
+
+enum JumpLevel { SHORT, MEDIUM, LONG, FULL }
+var current_jump_level: JumpLevel = JumpLevel.FULL  # Track current jump level
+
 var facing_right: bool = true
 var double_jump_unlocked: bool = false  # Has the player acquired the double jump ability?
 var has_double_jump: bool = false  # Can use double jump right now (resets on landing)
@@ -72,9 +85,7 @@ const POGO_DAMAGE: int = 30
 const HITSTOP_DURATION: float = 0.08  # Freeze frames duration
 const COMBO_WINDOW: float = 0.5  # Time to continue combo
 const ATTACK_DELAY: float = 0.2  # Delay between each attack in combo
-var damage_multiplier: float = 1.0  # Base damage multiplier (modified by power-ups)
-var damage_multiplier_timer: float = 0.0  # Timer for temporary damage buff
-var damage_multiplier_active: bool = false  # Is temporary damage buff active?
+var damage_multiplier: float = 1.0  # Base damage multiplier (permanent, stacks multiplicatively)
 var attack_speed_multiplier: float = 1.0  # Modifies attack delay (higher = faster attacks)
 var attack_delay_timer: float = 0.0  # Tracks time since last attack
 
@@ -100,6 +111,14 @@ var skill_unlocked: bool = false  # Has the player unlocked a skill?
 var skill_cooldown: float = 0.0
 const SKILL_COOLDOWN_TIME: float = 1.0  # 1 second between casts
 
+# Skill casting state
+var is_casting_skill: bool = false  # Is player currently casting a skill?
+var skill_startup_timer: float = 0.0  # Timer for startup frames
+var skill_suspension_timer: float = 0.0  # Timer for suspension after cast
+const SKILL_STARTUP_TIME: float = 0.2  # Startup frames before skill casts
+const SKILL_SUSPENSION_TIME: float = 0.15  # How long to suspend after cast
+const SKILL_RECOIL_FORCE: float = 300.0  # Recoil force for projectile skills
+
 # EXP and leveling system
 var current_level: int = 1
 var current_exp: int = 0
@@ -109,10 +128,9 @@ var exp_to_next_level: int = 100  # EXP needed for level 2
 var crit_chance: float = 0.0  # Percentage (0.0 to 1.0)
 var cooldown_reduction: float = 0.0  # Percentage (0.0 to 1.0)
 
-# Elemental imbue system
-var elemental_imbue_active: bool = false
-var elemental_imbue_timer: float = 0.0
-var current_melee_element: String = "physical"  # Default to physical damage
+# Movement speed boost system (permanent, no duration)
+var movement_speed_multiplier: float = 1.0  # Base speed multiplier
+var current_melee_element: String = "physical"  # Default to physical damage (for compatibility)
 
 # No cooldown buff system
 var no_cooldown_active: bool = false
@@ -165,21 +183,19 @@ func _physics_process(delta: float) -> void:
 		attack_on_cooldown = false
 		dash_cooldown = 0
 	
-	# Update elemental imbue timer
-	if elemental_imbue_active and elemental_imbue_timer > 0:
-		elemental_imbue_timer -= delta
-		if elemental_imbue_timer <= 0:
-			elemental_imbue_active = false
-			current_melee_element = "physical"
-			print("Elemental imbue expired")
-	
-	# Update damage multiplier timer
-	if damage_multiplier_active and damage_multiplier_timer > 0:
-		damage_multiplier_timer -= delta
-		if damage_multiplier_timer <= 0:
-			damage_multiplier_active = false
-			damage_multiplier = 1.0  # Reset to base
-			print("Damage multiplier expired - reset to 1.0x")
+	# Update skill casting timers
+	if is_casting_skill:
+		if skill_startup_timer > 0:
+			skill_startup_timer -= delta
+			if skill_startup_timer <= 0:
+				# Startup complete, actually cast the skill
+				_execute_skill_cast()
+		elif skill_suspension_timer > 0:
+			skill_suspension_timer -= delta
+			if skill_suspension_timer <= 0:
+				# Suspension complete, resume normal movement
+				is_casting_skill = false
+				can_input = true
 	
 	# Pogo cooldown resets when player starts descending
 	if pogo_on_cooldown and velocity.y > 0:  # Falling
@@ -199,14 +215,39 @@ func _physics_process(delta: float) -> void:
 			set_collision_mask_value(1, true)
 	
 	if not in_hitstop:
-		# Apply gravity (reduced during pogo, faster when falling)
+		# Apply gravity (reduced during pogo, variable based on jump level, suspended during skill cast)
 		if not is_on_floor():
-			if is_pogo_attacking:
+			if is_casting_skill and skill_startup_timer > 0:
+				# Suspend gravity and freeze velocity during startup frames
+				velocity.y = 0.0  # Freeze vertical velocity during startup
+			elif is_casting_skill:
+				# During suspension after cast, allow recoil but no gravity
+				# Don't apply gravity, but allow existing velocity (recoil) to persist
+				pass  # Skip gravity application
+			elif is_pogo_attacking:
 				velocity.y += GRAVITY * delta * 0.5  # Slower fall during pogo
 			else:
+				# Use variable gravity based on jump level (shorter = snappier)
+				var current_gravity: float
+				var current_fall_gravity: float
+				
+				match current_jump_level:
+					JumpLevel.SHORT:
+						current_gravity = GRAVITY_SHORT
+						current_fall_gravity = FALL_GRAVITY_SHORT
+					JumpLevel.MEDIUM:
+						current_gravity = GRAVITY_MEDIUM
+						current_fall_gravity = FALL_GRAVITY_MEDIUM
+					JumpLevel.LONG:
+						current_gravity = GRAVITY_LONG
+						current_fall_gravity = FALL_GRAVITY_LONG
+					JumpLevel.FULL:
+						current_gravity = GRAVITY_FULL
+						current_fall_gravity = FALL_GRAVITY_FULL
+				
 				# Use faster gravity when falling for snappier feel
-				var current_gravity = FALL_GRAVITY if velocity.y > 0 else GRAVITY
-				velocity.y += current_gravity * delta
+				var applied_gravity = current_fall_gravity if velocity.y > 0 else current_gravity
+				velocity.y += applied_gravity * delta
 		
 		# Handle fall-through platforms (down + jump on platform)
 		if Input.is_action_just_pressed("jump") and Input.is_action_pressed("ui_down") and is_on_floor():
@@ -245,13 +286,15 @@ func _physics_process(delta: float) -> void:
 				velocity.y = JUMP_VELOCITY
 				is_first_jump = true
 				jump_held_time = 0.0
+				current_jump_level = JumpLevel.FULL  # Default to full, will be set when cut
 				# Only give double jump if unlocked
 				if double_jump_unlocked:
 					has_double_jump = true
 			elif has_double_jump and double_jump_unlocked:
-				# Double jump in air - fixed height
+				# Double jump in air - fixed height (use medium gravity for double jump)
 				velocity.y = DOUBLE_JUMP_VELOCITY
 				is_first_jump = false
+				current_jump_level = JumpLevel.MEDIUM  # Double jump uses medium gravity
 				has_double_jump = false  # Used up the double jump
 		
 		# Variable jump height (only for first jump)
@@ -262,45 +305,59 @@ func _physics_process(delta: float) -> void:
 			else:
 				# Jump button released - cut jump based on hold duration
 				if jump_held_time < JUMP_SHORT_THRESHOLD:
-					# Very short tap - cut to 30%
+					# Very short tap - cut to 30% and use snappy gravity
 					velocity.y *= JUMP_CUT_MULTIPLIER_SHORT
+					current_jump_level = JumpLevel.SHORT
 					is_first_jump = false  # Stop checking after cut
 				elif jump_held_time < JUMP_MEDIUM_THRESHOLD:
-					# Short hold - cut to 55%
+					# Short hold - cut to 55% and use medium gravity
 					velocity.y *= JUMP_CUT_MULTIPLIER_MEDIUM
+					current_jump_level = JumpLevel.MEDIUM
 					is_first_jump = false
 				elif jump_held_time < JUMP_LONG_THRESHOLD:
-					# Medium hold - cut to 75%
+					# Medium hold - cut to 75% and use long gravity
 					velocity.y *= JUMP_CUT_MULTIPLIER_LONG
+					current_jump_level = JumpLevel.LONG
 					is_first_jump = false
-				# If held longer than LONG threshold, let it go full height
+				# If held longer than LONG threshold, let it go full height (floaty)
 		
 		# Reset double jump and first jump flag when landing
 		if is_on_floor():
 			if not has_double_jump and double_jump_unlocked:
 				has_double_jump = true
 			is_first_jump = true  # Reset for next jump
+			current_jump_level = JumpLevel.FULL  # Reset jump level
 		
 		# Handle dash input
 		if Input.is_action_just_pressed("dash") and dash_unlocked and dash_cooldown <= 0 and not is_dashing:
 			_perform_dash()
 		
-		# Handle horizontal movement (allowed during pogo, overridden by dash)
-		if is_dashing:
-			# During dash, maintain dash velocity
+		# Handle horizontal movement (allowed during pogo, overridden by dash, suspended during skill cast)
+		if is_casting_skill and skill_startup_timer > 0:
+			# Suspend horizontal movement during startup frames
+			velocity.x = 0.0
+		elif is_casting_skill:
+			# During suspension after cast, allow recoil but prevent input-based movement
+			# Let velocity decay naturally (recoil will fade)
+			velocity.x = move_toward(velocity.x, 0, MOVE_SPEED * delta * 5.0)
+		elif is_dashing:
+			# During dash, maintain dash velocity (scales with movement speed multiplier)
 			var dash_direction = 1.0 if facing_right else -1.0
-			velocity.x = dash_direction * DASH_SPEED
+			var current_dash_speed = DASH_SPEED * movement_speed_multiplier
+			velocity.x = dash_direction * current_dash_speed
 		else:
 			var direction = Input.get_axis("move_left", "move_right")
 			if direction != 0:
-				velocity.x = direction * MOVE_SPEED
+				var current_speed = MOVE_SPEED * movement_speed_multiplier
+				velocity.x = direction * current_speed
 				# Flip character to face movement direction
 				if direction > 0 and not facing_right:
 					_flip_character(true)
 				elif direction < 0 and facing_right:
 					_flip_character(false)
 			else:
-				velocity.x = move_toward(velocity.x, 0, MOVE_SPEED * delta * 5.0)
+				var current_speed = MOVE_SPEED * movement_speed_multiplier
+				velocity.x = move_toward(velocity.x, 0, current_speed * delta * 5.0)
 		
 		# Move character
 		move_and_slide()
@@ -346,6 +403,10 @@ func _flip_character(right: bool) -> void:
 
 func _input(event: InputEvent) -> void:
 	if not game_active or in_hitstop:
+		return
+	
+	# Prevent input during skill casting
+	if is_casting_skill:
 		return
 	
 	if event.is_action_pressed("attack") and can_input:
@@ -554,7 +615,7 @@ func _get_random_pogo_animation() -> String:
 	return chosen
 
 func _cast_skill() -> void:
-	"""Cast the current skill. Scalable for multiple skills."""
+	"""Start casting the current skill with startup frames. Scalable for multiple skills."""
 	# Check if skill is unlocked
 	if not skill_unlocked or current_skill == "":
 		return  # No skill unlocked yet
@@ -562,6 +623,23 @@ func _cast_skill() -> void:
 	# Check cooldown
 	if skill_cooldown > 0:
 		return  # Still on cooldown
+	
+	# Check if already casting
+	if is_casting_skill:
+		return
+	
+	# Start casting process with startup frames
+	is_casting_skill = true
+	can_input = false
+	skill_startup_timer = SKILL_STARTUP_TIME
+	skill_suspension_timer = 0.0  # Will be set after skill is cast
+	
+	print("Starting skill cast: ", current_skill, " (startup: ", SKILL_STARTUP_TIME, "s)")
+
+func _execute_skill_cast() -> void:
+	"""Actually execute the skill cast after startup frames."""
+	# Start suspension timer after skill is cast
+	skill_suspension_timer = SKILL_SUSPENSION_TIME
 	
 	# Cast based on current skill
 	match current_skill:
@@ -573,6 +651,8 @@ func _cast_skill() -> void:
 			_cast_icelance()
 		_:
 			push_warning("Unknown skill: " + current_skill)
+			is_casting_skill = false
+			can_input = true
 
 func _cast_thunderbolt() -> void:
 	"""Cast a thunderbolt projectile."""
@@ -601,8 +681,16 @@ func _cast_thunderbolt() -> void:
 	# Setup the projectile
 	# Apply player's damage multiplier, plus god mode bonus if active
 	var god_mode_bonus = 100.0 if DebugSettings.god_mode else 1.0
-	var damage = int(50 * damage_multiplier * god_mode_bonus)
+	var base_damage = 100  # Base 100 total = 10 per tick over 10 ticks
+	# Ensure multiplier is at least 1.0 (safety check)
+	var actual_multiplier = max(1.0, damage_multiplier)
+	var damage = int(base_damage * actual_multiplier * god_mode_bonus)
+	print("Thunderbolt damage calculation: base=%d, multiplier=%.2fx, final=%d" % [base_damage, actual_multiplier, damage])
 	thunderbolt.setup(direction, damage)
+	
+	# Apply recoil (opposite direction of projectile)
+	var recoil_direction = -direction
+	velocity += recoil_direction * SKILL_RECOIL_FORCE
 	
 	# Add screen shake for casting
 	_screen_shake(3.0, 0.1)
@@ -641,6 +729,10 @@ func _cast_fireball() -> void:
 	var damage = int(50 * damage_multiplier * god_mode_bonus)
 	fireball.setup(direction, damage)
 	
+	# Apply recoil (opposite direction of projectile)
+	var recoil_direction = -direction
+	velocity += recoil_direction * SKILL_RECOIL_FORCE
+	
 	# Add screen shake for casting
 	_screen_shake(3.0, 0.1)
 	
@@ -663,6 +755,8 @@ func _cast_icelance() -> void:
 	var god_mode_bonus = 100.0 if DebugSettings.god_mode else 1.0
 	var damage = int(50 * damage_multiplier * god_mode_bonus)
 	icelance.setup(Vector2.ZERO, damage)  # No direction needed
+	
+	# No recoil for AOE nova (stays centered on player)
 	
 	# Add screen shake for casting
 	_screen_shake(3.0, 0.1)
@@ -719,50 +813,56 @@ func _perform_dash() -> void:
 	print("Dash! Direction: ", "right" if facing_right else "left")
 
 func add_damage_multiplier(multiplier: float, duration: float) -> void:
-	"""Add a temporary damage multiplier power-up."""
-	damage_multiplier = multiplier  # Set to the new multiplier (not stack)
-	damage_multiplier_active = true
-	damage_multiplier_timer = duration
-	print("Damage multiplier activated! %.1fx damage for %.0f seconds" % [damage_multiplier, duration])
+	"""Add a permanent damage multiplier power-up. Stacks multiplicatively."""
+	# Always stack multiplicatively (multiply existing multiplier)
+	var is_stacking = damage_multiplier > 1.0
+	if is_stacking:
+		damage_multiplier *= multiplier
+		print("Damage multiplier stacked! New total: %.1fx (multiplied by %.1fx)" % [damage_multiplier, multiplier])
+	else:
+		damage_multiplier = multiplier
+		print("Damage multiplier activated! %.1fx damage (permanent)" % damage_multiplier)
+	
 	_play_powerup_effect(Color(1.0, 0.8, 0.2))
-	powerup_collected.emit("damage_multiplier", true, duration, {"multiplier": damage_multiplier})
+	powerup_collected.emit("damage_multiplier", false, 0.0, {"multiplier": damage_multiplier, "is_stack": is_stacking})
 
-func apply_elemental_imbue(duration: float) -> void:
-	"""Apply elemental imbue to melee attacks based on chosen skill."""
-	elemental_imbue_active = true
-	elemental_imbue_timer = duration
+func apply_movement_speed_boost(multiplier: float, duration: float) -> void:
+	"""Apply permanent movement speed boost. Stacks multiplicatively."""
+	var is_stacking = movement_speed_multiplier > 1.0
 	
-	# Set element based on current skill
-	match current_skill:
-		"thunderbolt":
-			current_melee_element = "lightning"
-		"fireball":
-			current_melee_element = "fire"
-		"icelance":
-			current_melee_element = "ice"
-		_:
-			current_melee_element = "physical"  # Fallback
+	if is_stacking:
+		# Multiply the multipliers together (multiplicative stacking)
+		movement_speed_multiplier *= multiplier
+		print("Movement speed boost stacked! New total: %.1fx speed (multiplied by %.1fx, permanent)" % [movement_speed_multiplier, multiplier])
+	else:
+		# First activation
+		movement_speed_multiplier = multiplier
+		print("Movement speed boost activated! %.1fx speed (permanent)" % movement_speed_multiplier)
 	
-	print("Elemental imbue activated! Melee attacks now deal %s damage for %.0f seconds" % [current_melee_element, duration])
-	_play_powerup_effect(Color(0.8, 0.4, 1.0))
-	powerup_collected.emit("elemental_imbue", true, duration, {"element": current_melee_element})
+	_play_powerup_effect(Color(0.3, 0.8, 1.0))
+	powerup_collected.emit("movement_speed", false, 0.0, {"multiplier": movement_speed_multiplier, "is_stack": is_stacking})
 
 func apply_no_cooldown(duration: float) -> void:
-	"""Remove all cooldowns for a duration."""
-	no_cooldown_active = true
-	no_cooldown_timer = duration
+	"""Remove all cooldowns for a duration. Stacks by adding duration."""
+	var is_stacking = no_cooldown_active and no_cooldown_timer > 0
+	if is_stacking:
+		# Add to existing duration
+		no_cooldown_timer += duration
+		print("No cooldown duration extended! New total: %.1f seconds (added %.1f seconds)" % [no_cooldown_timer, duration])
+	else:
+		# First activation
+		no_cooldown_active = true
+		no_cooldown_timer = duration
+		# Immediately clear all cooldowns
+		skill_cooldown = 0
+		attack_cooldown = 0
+		attack_on_cooldown = false
+		# Notify UI to clear cooldown animations
+		no_cooldown_activated.emit()
+		print("NO COOLDOWN MODE! Spam away for %.0f seconds! 🔥" % duration)
 	
-	# Immediately clear all cooldowns
-	skill_cooldown = 0
-	attack_cooldown = 0
-	attack_on_cooldown = false
-	
-	# Notify UI to clear cooldown animations
-	no_cooldown_activated.emit()
-	
-	print("NO COOLDOWN MODE! Spam away for %.0f seconds! 🔥" % duration)
 	_play_powerup_effect(Color(0.2, 1.0, 0.6))
-	powerup_collected.emit("no_cooldown", true, duration, {})
+	powerup_collected.emit("no_cooldown", true, no_cooldown_timer, {"is_stack": is_stacking})
 
 func _play_powerup_effect(color: Color) -> void:
 	"""Visual feedback for collecting a power-up."""

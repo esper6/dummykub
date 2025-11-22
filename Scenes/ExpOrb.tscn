@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://exporb_001"]
+
+[ext_resource type="Script" path="res://Scripts/ExpOrb.gd" id="1_exporb"]
+
+[node name="ExpOrb" type="Node2D"]
+z_index = 50
+script = ExtResource("1_exporb")

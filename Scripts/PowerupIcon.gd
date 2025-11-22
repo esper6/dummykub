@@ -87,21 +87,13 @@ func setup(type: String, temporary: bool, duration: float, data: Dictionary) -> 
 			if "multiplier" in data:
 				stack_label.text = "%.1fx" % data["multiplier"]
 				stack_label.visible = true
-		"elemental_imbue":
-			var element = data.get("element", "physical")
-			match element:
-				"lightning":
-					background.color = Color(0.9, 0.9, 0.2, 0.9)  # Yellow
-					icon_label.text = "⚡"
-				"fire":
-					background.color = Color(1.0, 0.3, 0.1, 0.9)  # Red
-					icon_label.text = "🔥"
-				"ice":
-					background.color = Color(0.3, 0.8, 1.0, 0.9)  # Cyan
-					icon_label.text = "❄"
-				_:
-					background.color = Color(0.7, 0.4, 1.0, 0.9)  # Purple
-					icon_label.text = "✨"
+		"movement_speed":
+			background.color = Color(0.3, 0.8, 1.0, 0.9)  # Cyan/blue
+			icon_label.text = "💨"
+			# Show speed multiplier value
+			if "multiplier" in data:
+				stack_label.text = "%.1fx" % data["multiplier"]
+				stack_label.visible = true
 		"no_cooldown":
 			background.color = Color(0.2, 1.0, 0.5, 0.9)  # Green
 			icon_label.text = "⏱"
@@ -159,6 +151,11 @@ func update_stack(data: Dictionary) -> void:
 		var pulse_tween = create_tween()
 		pulse_tween.tween_property(self, "scale", Vector2(1.2, 1.2), 0.1)
 		pulse_tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.1)
+
+func update_timer(new_duration: float) -> void:
+	"""Update the timer duration (useful when stacking power-ups)."""
+	time_remaining = new_duration
+	max_duration = new_duration
 
 func start_cooldown(duration: float) -> void:
 	"""Start a cooldown animation on this icon (for relics with cooldowns)."""
