@@ -6,7 +6,6 @@ var god_mode: bool = false:
 	set(value):
 		god_mode = value
 		if god_mode:
-			print("🔥 GOD MODE ENABLED - 100x damage!")
+			pass
 		else:
-			print("God mode disabled")
-
+			pass

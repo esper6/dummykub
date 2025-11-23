@@ -36,7 +36,6 @@ const PROGRESS_FILE_PATH: String = "user://progress.json"
 
 func _ready() -> void:
 	load_settings()
-	print("[GameState] Initialized")
 
 # ============================================
 # SETTINGS MANAGEMENT
@@ -79,14 +78,12 @@ func save_settings() -> void:
 		var json_string := JSON.stringify(settings, "\t")
 		file.store_string(json_string)
 		file.close()
-		print("[GameState] Settings saved")
 	else:
 		push_error("[GameState] Failed to save settings")
 
 ## Load settings from disk
 func load_settings() -> void:
 	if not FileAccess.file_exists(SETTINGS_FILE_PATH):
-		print("[GameState] No settings file found, using defaults")
 		return
 	
 	var file := FileAccess.open(SETTINGS_FILE_PATH, FileAccess.READ)
@@ -105,7 +102,6 @@ func load_settings() -> void:
 		# Merge with defaults (preserves new settings if version changes)
 		for key in loaded_settings:
 			settings[key] = loaded_settings[key]
-		print("[GameState] Settings loaded")
 	else:
 		push_error("[GameState] Failed to parse settings JSON")
 
@@ -130,14 +126,12 @@ func save_progress() -> void:
 		if EventBus:
 			EventBus.game_saved.emit()
 		
-		print("[GameState] Progress saved")
 	else:
 		push_error("[GameState] Failed to save progress")
 
 ## Load game progress
 func load_progress() -> bool:
 	if not FileAccess.file_exists(PROGRESS_FILE_PATH):
-		print("[GameState] No progress file found")
 		return false
 	
 	var file := FileAccess.open(PROGRESS_FILE_PATH, FileAccess.READ)
@@ -160,7 +154,6 @@ func load_progress() -> bool:
 		if EventBus:
 			EventBus.game_loaded.emit()
 		
-		print("[GameState] Progress loaded")
 		return true
 	else:
 		push_error("[GameState] Failed to parse progress JSON")
@@ -174,7 +167,6 @@ func has_save_file() -> bool:
 func delete_save_file() -> void:
 	if has_save_file():
 		DirAccess.remove_absolute(PROGRESS_FILE_PATH)
-		print("[GameState] Save file deleted")
 
 # ============================================
 # EXAMPLE: PROGRESS TRACKING METHODS

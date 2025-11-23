@@ -53,8 +53,8 @@ func _on_body_entered(body: Node2D) -> void:
 	if collected:
 		return
 	
-	# Check if it's the player
-	if body.name == "Player" or body.is_in_group("player") or body is CharacterBody2D:
+	# Only allow player to collect (not companions)
+	if body.name == "Player" or body.is_in_group("player"):
 		_collect(body)
 
 func _collect(player: Node2D) -> void:

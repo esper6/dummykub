@@ -36,7 +36,6 @@ func _ready() -> void:
 	# Get the player position to track
 	_setup_target_position()
 	
-	print("EXP orb spawned at global_position=", global_position, " local_position=", position, " with exp_amount=", exp_amount)
 
 func _setup_sprite() -> void:
 	"""Setup the green ball sprite."""
@@ -108,6 +107,17 @@ func _process(delta: float) -> void:
 		start_position = position
 	
 	if state == "floating":
+		# Update target to player's current position (for pickup detection)
+		_update_player_target()
+		
+		# Check if player is close enough to pick up during floating
+		var distance_to_player = global_position.distance_to(target_position)
+		if distance_to_player < 50.0:  # Pickup range during floating (slightly larger than flying)
+			# Player is close enough - grant EXP and remove
+			_grant_exp()
+			queue_free()
+			return
+		
 		# Float up and down for 1 second
 		float_time += delta
 		
@@ -188,4 +198,3 @@ func _grant_exp() -> void:
 	
 	if player and player.has_method("gain_exp"):
 		player.gain_exp(exp_amount)
-		print("EXP orb granted ", exp_amount, " EXP to player")

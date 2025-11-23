@@ -47,7 +47,7 @@ signal game_loaded()
 # ============================================
 
 func _ready() -> void:
-	print("[EventBus] Initialized - Minimal version")
+	pass
 
 # ============================================
 # CONVENIENCE METHODS (OPTIONAL)
@@ -81,4 +81,3 @@ signal dummy_spawned(dummy: Node2D)
 
 ## Emitted when a dummy dies
 signal dummy_died(dummy: Node2D)
-

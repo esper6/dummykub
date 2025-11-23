@@ -10,6 +10,15 @@ signal stats_confirmed(auto_stats: Array, manual_allocations: Dictionary)
 @onready var confirm_button: Button = $Panel/VBoxContainer/ConfirmButton
 @onready var points_label: Label = $Panel/VBoxContainer/PointsLabel
 @onready var animation_container: Control = $Panel/VBoxContainer/AnimationContainer
+@onready var panel: Panel = $Panel
+
+# Menu button references (for pause menu integration)
+var menu_button_container: HBoxContainer = null
+var resume_button: Button = null
+var controls_button: Button = null
+var settings_button: Button = null
+var main_menu_button: Button = null
+var pause_menu_ref: Node = null  # Reference to PauseMenu for callbacks
 
 # Stat definitions (11 stats)
 var stats: Array[Dictionary] = [
@@ -97,7 +106,10 @@ var animation_active: bool = false
 var animation_timer: float = 0.0
 const ANIMATION_DURATION: float = 3.0
 var current_highlighted_indices: Array[int] = []
-var final_auto_stats: Array[int] = []  # 3 random stat indices
+var final_auto_stats: Array[int] = []  # Random stat indices (3-6 based on luck)
+var base_auto_stats: Array[int] = []  # Base 3 stats
+var bonus_auto_stats: Array[int] = []  # Bonus stats from luck
+var showing_bonus_stats: bool = false  # Are we currently showing bonus stats animation?
 var flashing_active: bool = false
 var flash_count: int = 0
 const FLASH_COUNT_TARGET: int = 3
@@ -118,19 +130,140 @@ func _ready() -> void:
 	# Connect confirm button
 	if confirm_button:
 		confirm_button.pressed.connect(_on_confirm_pressed)
+	
+	# Create menu button container on the side
+	_create_menu_buttons()
+
+func show_stats_display(player_ref: Node) -> void:
+	"""Show stats in display-only mode (for pause menu)."""
+	player = player_ref
+	
+	# Clear previous UI
+	_clear_ui()
+	
+	# Create stat columns (display only, no buttons)
+	_create_stat_columns_display_only()
+	
+	# Hide confirm button and points label for display mode
+	if confirm_button:
+		confirm_button.visible = false
+	if points_label:
+		points_label.visible = false
+	
+	# Show menu buttons
+	if menu_button_container:
+		menu_button_container.visible = true
+	
+	# Show the screen (don't pause - already paused by pause menu)
+	show()
+
+func _create_stat_columns_display_only() -> void:
+	"""Create the 11 stat columns with tic-tac indicators (display only, no buttons)."""
+	for i in range(stats.size()):
+		var stat = stats[i]
+		var column = _create_stat_column_display_only(stat, i)
+		stat_container.add_child(column)
+		stat_columns.append(column)
+
+func _create_stat_column_display_only(stat: Dictionary, index: int) -> Control:
+	"""Create a single stat column with tic-tac stack (display only, no buttons)."""
+	# Use a Control node as the base so we can position elements absolutely
+	var column = Control.new()
+	column.custom_minimum_size = Vector2(90, 0)  # Fixed width, height will be set by content
+	
+	# Stat name label (positioned at top, independent of bar)
+	var name_label = Label.new()
+	name_label.text = stat.name
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.custom_minimum_size = Vector2(90, 40)  # Fixed width and height
+	name_label.position = Vector2(0, 0)  # Top of column
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.add_theme_color_override("font_color", stat.color)
+	name_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	name_label.add_theme_constant_override("outline_size", 2)
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.clip_contents = true
+	name_label.name = "NameLabel"
+	column.add_child(name_label)
+	
+	# Icon label (positioned below name, fixed position)
+	var icon_label = Label.new()
+	icon_label.text = stat.icon
+	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	icon_label.custom_minimum_size = Vector2(90, 40)  # Fixed width and height
+	icon_label.position = Vector2(0, 40)  # Below name label
+	icon_label.add_theme_font_size_override("font_size", 32)
+	icon_label.name = "IconLabel"
+	column.add_child(icon_label)
+	
+	# Tic-tac stack container (positioned at fixed offset from top, independent of name)
+	var stack_container = VBoxContainer.new()
+	stack_container.add_theme_constant_override("separation", 2)
+	stack_container.custom_minimum_size = Vector2(40, 200)  # Fixed height for stack
+	stack_container.position = Vector2(25, 80)  # Fixed position: below icon (40 + 40 = 80)
+	stack_container.name = "StackContainer"
+	column.add_child(stack_container)
+	
+	# Create tic-tac indicators (max 10 shown)
+	var max_indicators = 10
+	var current_value = player.get_stat_value(stat.id) if player else 0
+	for i in range(max_indicators):  # Count from 0 to 9 (normal order)
+		var tictac = ColorRect.new()
+		tictac.custom_minimum_size = Vector2(30, 15)  # Tic-tac shape (wide, short)
+		var filled_count_from_bottom = max_indicators - i  # How many from bottom (including this one)
+		var is_filled = filled_count_from_bottom <= current_value
+		tictac.color = stat.color if is_filled else Color(0.3, 0.3, 0.3, 0.5)
+		tictac.name = "TicTac" + str(i)
+		stack_container.add_child(tictac)
+		
+		# Add emoji label if this tic-tac is already filled
+		if is_filled:
+			_add_emoji_to_tictac(tictac, stat.icon, false)  # false = no animation for existing
+	
+	# Current value label (positioned below stack)
+	var value_label = Label.new()
+	value_label.text = str(current_value)
+	value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value_label.custom_minimum_size = Vector2(90, 25)  # Fixed width and height
+	value_label.position = Vector2(0, 280)  # Below stack (80 + 200 = 280)
+	value_label.add_theme_font_size_override("font_size", 18)
+	value_label.add_theme_color_override("font_color", Color.WHITE)
+	value_label.name = "ValueLabel"
+	column.add_child(value_label)
+	
+	# Set column height to accommodate all elements
+	column.custom_minimum_size = Vector2(90, 305)  # Total height: name(40) + icon(40) + stack(200) + value(25) = 305
+	
+	# Store stat_id in column metadata
+	column.set_meta("stat_id", stat.id)
+	column.set_meta("stat_index", index)
+	
+	return column
 
 func _process(delta: float) -> void:
 	if animation_active:
 		animation_timer += delta
 		_update_animation(delta)
 		
-		# Check for skip input (click or attack button)
-		if Input.is_action_just_pressed("ui_accept") or Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("ui_select"):
+		# Check for skip input (click anywhere, keyboard, or attack button)
+		if Input.is_action_just_pressed("ui_accept") or Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("ui_select") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_skip_animation()
+	
+	# Also allow skipping flash sequence
+	if flashing_active:
+		if Input.is_action_just_pressed("ui_accept") or Input.is_action_just_pressed("attack") or Input.is_action_just_pressed("ui_select") or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_skip_flash_sequence()
 
 func show_stat_selection(player_ref: Node) -> void:
 	"""Show the stat selection screen with animation."""
 	player = player_ref
+	
+	# Hide menu buttons during level up
+	if menu_button_container:
+		menu_button_container.visible = false
 	
 	# Reset state
 	points_remaining = 2
@@ -148,24 +281,28 @@ func show_stat_selection(player_ref: Node) -> void:
 	# Create stat columns
 	_create_stat_columns()
 	
-	# Pick 3 random stats for auto-allocation
+	# Pick random stats for auto-allocation (number depends on luck stat)
 	_pick_random_stats()
 	
 	# Reset button state (ensure it's set to "Confirm" and connected properly)
-	confirm_button.text = "Confirm"
-	confirm_button.disabled = true
-	points_label.text = "Points Remaining: 2"
+	if confirm_button:
+		confirm_button.text = "Confirm"
+		confirm_button.disabled = true
+		confirm_button.visible = true  # Make sure it's visible for level up
+	if points_label:
+		points_label.text = "Points Remaining: 2"
+		points_label.visible = true  # Make sure it's visible for level up
 	
 	# Ensure button is connected to confirm function (disconnect GO! if it was connected)
-	if confirm_button.pressed.is_connected(_on_go_pressed):
-		confirm_button.pressed.disconnect(_on_go_pressed)
-	if not confirm_button.pressed.is_connected(_on_confirm_pressed):
-		confirm_button.pressed.connect(_on_confirm_pressed)
+	if confirm_button:
+		if confirm_button.pressed.is_connected(_on_go_pressed):
+			confirm_button.pressed.disconnect(_on_go_pressed)
+		if not confirm_button.pressed.is_connected(_on_confirm_pressed):
+			confirm_button.pressed.connect(_on_confirm_pressed)
 	
 	# Show and pause
 	show()
 	get_tree().paused = true
-	print("Stat selection screen shown - game paused")
 
 func _clear_ui() -> void:
 	"""Clear all UI elements."""
@@ -285,6 +422,8 @@ func _create_stat_column(stat: Dictionary, index: int) -> Control:
 	style_normal.corner_radius_bottom_left = 4
 	plus_button.add_theme_stylebox_override("normal", style_normal)
 	plus_button.name = "PlusButton"
+	# Disable during animation (will be enabled after animation/flash completes)
+	plus_button.disabled = true
 	plus_button.pressed.connect(_on_plus_button_pressed.bind(stat.id, index))
 	button_container.add_child(plus_button)
 	
@@ -309,6 +448,7 @@ func _create_stat_column(stat: Dictionary, index: int) -> Control:
 	minus_button.add_theme_stylebox_override("normal", style_minus)
 	minus_button.name = "MinusButton"
 	minus_button.visible = false  # Hidden by default
+	minus_button.disabled = true  # Disabled during animation
 	minus_button.pressed.connect(_on_minus_button_pressed.bind(stat.id, index))
 	button_container.add_child(minus_button)
 	
@@ -377,14 +517,71 @@ func _clear_highlighted_tictacs() -> void:
 			tictac.modulate = Color.WHITE
 	highlighted_tictacs.clear()
 
+func _calculate_num_random_stats() -> int:
+	"""Calculate number of random stats to give based on player's luck stat.
+	Base: 3 stats. Luck can proc once per level up to add 1-3 additional stats.
+	Chance increases with luck stat. At max luck (10), guaranteed to get 6 total stats."""
+	# Get player's luck stat value
+	var luck_value = 0
+	if player:
+		luck_value = player.get_stat_value("luck")
+	
+	const BASE_RANDOM_STATS = 3
+	const MAX_LUCK = 10
+	const MAX_RANDOM_STATS = 6
+	const BASE_LUCK_CHANCE = 0.1  # Base 10% chance
+	const LUCK_CHANCE_PER_POINT = 0.05  # +5% per luck point
+	
+	var num_random_stats = BASE_RANDOM_STATS
+	
+	# Calculate total luck proc chance (capped at 100%)
+	var luck_proc_chance = BASE_LUCK_CHANCE + (luck_value * LUCK_CHANCE_PER_POINT)
+	luck_proc_chance = min(luck_proc_chance, 1.0)
+	
+	# Roll once for luck proc (only one proc per level up)
+	if randf() < luck_proc_chance:
+		# Get 1-3 additional random stats
+		var bonus = randi_range(1, 3)
+		num_random_stats += bonus
+	
+	# At max luck, ensure we get at least 6 stats total
+	if luck_value >= MAX_LUCK:
+		if num_random_stats < MAX_RANDOM_STATS:
+			# Guarantee we reach max (add the difference)
+			var needed = MAX_RANDOM_STATS - num_random_stats
+			num_random_stats = MAX_RANDOM_STATS
+	
+	# Cap at max (in case we rolled really well)
+	num_random_stats = min(num_random_stats, MAX_RANDOM_STATS)
+	
+	return num_random_stats
+
 func _pick_random_stats() -> void:
-	"""Pick 3 random stats for auto-allocation."""
+	"""Pick random stats for auto-allocation based on luck stat.
+	Separates base 3 stats from luck bonus stats."""
+	var num_random_stats = _calculate_num_random_stats()
+	var luck_value = player.get_stat_value("luck") if player else 0
+	
 	var available_indices: Array[int] = []
 	for i in range(stats.size()):
 		available_indices.append(i)
 	available_indices.shuffle()
-	final_auto_stats = available_indices.slice(0, 3)
-	print("Random stats selected: ", final_auto_stats)
+	
+	# Always get base 3 stats
+	base_auto_stats = available_indices.slice(0, 3)
+	
+	# Get bonus stats if any (remaining after base 3)
+	var bonus_count = num_random_stats - 3
+	if bonus_count > 0:
+		# Remove base stats from available pool and pick bonus stats
+		var remaining_indices = available_indices.slice(3)
+		remaining_indices.shuffle()
+		bonus_auto_stats = remaining_indices.slice(0, bonus_count)
+	else:
+		bonus_auto_stats = []
+	
+	# Set final_auto_stats to base stats for initial animation
+	final_auto_stats = base_auto_stats.duplicate()
 
 func _update_animation(_delta: float) -> void:
 	"""Update the animation - tic-tacs randomly light up, starting fast and slowing down."""
@@ -413,13 +610,17 @@ func _update_animation(_delta: float) -> void:
 		# Clear previous highlights
 		_clear_highlighted_tictacs()
 		
-		# Pick 3 random stats to highlight
+		# Pick random stats to highlight (same number as will be selected based on luck)
 		current_highlighted_indices.clear()
 		var available: Array[int] = []
 		for i in range(stats.size()):
 			available.append(i)
 		available.shuffle()
-		current_highlighted_indices = available.slice(0, 3)
+		
+		# Use the same number of stats as final selection (based on luck)
+		# If final_auto_stats is already set, use its size, otherwise calculate
+		var num_to_highlight = final_auto_stats.size() if final_auto_stats.size() > 0 else _calculate_num_random_stats()
+		current_highlighted_indices = available.slice(0, num_to_highlight)
 		
 		# Highlight one random tic-tac from each of the 3 stats
 		_highlight_random_tictacs()
@@ -511,16 +712,44 @@ func _skip_animation() -> void:
 	animation_timer = ANIMATION_DURATION  # Set to completion
 	_on_animation_complete()
 
+func _skip_flash_sequence() -> void:
+	"""Skip the flash sequence and enable stat allocation."""
+	if not flashing_active:
+		return
+	
+	flashing_active = false
+	flash_count = FLASH_COUNT_TARGET  # Set to completion
+	_clear_highlighted_tictacs()
+	_update_points_display()  # This will re-enable buttons
+
 func _on_animation_complete() -> void:
-	"""Animation finished - land on final 3 stats."""
+	"""Animation finished - land on final stats."""
 	animation_active = false
-	current_highlighted_indices = final_auto_stats.duplicate()
+	
+	# If we're showing bonus stats, apply them and finish
+	if showing_bonus_stats:
+		_apply_and_flash_stats(bonus_auto_stats)
+		return
+	
+	# Otherwise, we're showing base stats - apply them first
+	_apply_and_flash_stats(base_auto_stats)
+	
+	# After base stats are applied, check if we have bonus stats
+	if bonus_auto_stats.size() > 0:
+		# Show celebratory text overlay
+		await _show_luck_celebration(bonus_auto_stats.size())
+		# Start bonus stats animation
+		_start_bonus_stats_animation()
+
+func _apply_and_flash_stats(stat_indices: Array[int]) -> void:
+	"""Apply stats and show flash sequence for given stat indices."""
+	current_highlighted_indices = stat_indices.duplicate()
 	
 	# Clear previous highlights
 	_clear_highlighted_tictacs()
 	
-	# Highlight the bottom-most tic-tac of each final stat (the one that will be filled)
-	for stat_index in final_auto_stats:
+	# Highlight the bottom-most tic-tac of each stat (the one that will be filled)
+	for stat_index in stat_indices:
 		if stat_index >= stat_columns.size():
 			continue
 		
@@ -531,12 +760,6 @@ func _on_animation_complete() -> void:
 		var max_indicators = stack_container.get_child_count()
 		
 		# Find the bottom-most tic-tac that will be filled (the new one)
-		# Tic-tacs are in normal order: index 0 = top, index 9 = bottom
-		# After auto-allocation, total will be current_value + 1
-		# Position from bottom = max_indicators - container_index
-		# We want position (current_value + 1) from bottom:
-		#   max_indicators - container_index = current_value + 1
-		#   container_index = max_indicators - current_value - 1
 		var bottom_tictac_index = max_indicators - (current_value + 1)
 		if bottom_tictac_index >= 0 and bottom_tictac_index < max_indicators:
 			var tictac = stack_container.get_child(bottom_tictac_index)
@@ -553,8 +776,8 @@ func _on_animation_complete() -> void:
 				"original_color": original_color
 			}
 	
-	# Apply auto stats (+1 to each) - these go into auto_allocations, not manual
-	for stat_index in final_auto_stats:
+	# Apply auto stats (+1 to each selected stat) - these go into auto_allocations, not manual
+	for stat_index in stat_indices:
 		var stat_id = stats[stat_index].id
 		auto_allocations[stat_id] = auto_allocations.get(stat_id, 0) + 1
 		_update_stat_column(stat_index)
@@ -575,6 +798,66 @@ func _on_animation_complete() -> void:
 	# Start flash sequence
 	_start_flash_sequence()
 
+func _show_luck_celebration(bonus_count: int) -> void:
+	"""Show celebratory text overlay for luck bonus stats."""
+	# Create celebratory label
+	var celebration_label = Label.new()
+	celebration_label.text = "🍀 LUCK! +%d Bonus Stats! 🍀" % bonus_count
+	celebration_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	celebration_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	celebration_label.add_theme_font_size_override("font_size", 48)
+	celebration_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))  # Gold color
+	celebration_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	celebration_label.add_theme_constant_override("outline_size", 4)
+	
+	# Position at center of screen (use anchors for centering)
+	celebration_label.anchor_left = 0.5
+	celebration_label.anchor_top = 0.5
+	celebration_label.anchor_right = 0.5
+	celebration_label.anchor_bottom = 0.5
+	celebration_label.offset_left = -300
+	celebration_label.offset_top = -50
+	celebration_label.offset_right = 300
+	celebration_label.offset_bottom = 50
+	celebration_label.custom_minimum_size = Vector2(600, 100)
+	celebration_label.name = "LuckCelebrationLabel"
+	
+	# Add to animation container
+	animation_container.add_child(celebration_label)
+	
+	# Animate: start scaled up and faded, zoom in and fade in, then fade out
+	celebration_label.modulate.a = 0.0
+	celebration_label.scale = Vector2(0.5, 0.5)
+	
+	var celebration_tween = create_tween()
+	celebration_tween.set_parallel(true)
+	# Fade in and scale up
+	celebration_tween.tween_property(celebration_label, "modulate:a", 1.0, 0.3)
+	celebration_tween.tween_property(celebration_label, "scale", Vector2(1.2, 1.2), 0.3).set_ease(Tween.EASE_OUT)
+	# Bounce back to normal size
+	celebration_tween.chain().tween_property(celebration_label, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_IN)
+	# Hold for a moment
+	await celebration_tween.finished
+	await get_tree().create_timer(0.5).timeout
+	# Fade out
+	var fade_out_tween = create_tween()
+	fade_out_tween.tween_property(celebration_label, "modulate:a", 0.0, 0.3)
+	await fade_out_tween.finished
+	
+	# Remove label
+	celebration_label.queue_free()
+
+func _start_bonus_stats_animation() -> void:
+	"""Start the roulette animation for bonus stats."""
+	showing_bonus_stats = true
+	final_auto_stats = bonus_auto_stats.duplicate()
+	
+	# Reset animation state
+	animation_active = true
+	animation_timer = 0.0
+	last_jump_time = 0.0
+	_clear_highlighted_tictacs()
+
 func _start_flash_sequence() -> void:
 	"""Flash the yellow boxes and tic-tacs 3 times."""
 	flashing_active = true
@@ -587,6 +870,9 @@ func _perform_flash() -> void:
 		# Flash sequence complete, clear highlights
 		_clear_highlighted_tictacs()
 		flashing_active = false
+		# If we just finished bonus stats, we're done with all animations
+		if showing_bonus_stats:
+			showing_bonus_stats = false
 		# Enable allocation (but confirm button stays disabled until all points allocated)
 		_update_points_display()
 		return
@@ -594,7 +880,9 @@ func _perform_flash() -> void:
 	flash_count += 1
 	
 	# Flash the highlighted tic-tacs (the ones that were auto-allocated)
-	for stat_index in final_auto_stats:
+	# Use the appropriate stats array based on whether we're showing bonus stats
+	var stats_to_flash = bonus_auto_stats if showing_bonus_stats else base_auto_stats
+	for stat_index in stats_to_flash:
 		if stat_index >= stat_columns.size():
 			continue
 		
@@ -624,8 +912,26 @@ func _perform_flash() -> void:
 
 func _on_plus_button_pressed(stat_id: String, column_index: int) -> void:
 	"""Called when player clicks a + button."""
+	# If animation or flash is active, skip it first
+	if animation_active:
+		_skip_animation()
+		return
+	if flashing_active:
+		_skip_flash_sequence()
+		return
+	
 	if points_remaining <= 0:
 		return
+	
+	# Check if stat is already at max (10)
+	var current_value = player.get_stat_value(stat_id) if player else 0
+	var manual_allocated = manual_allocations.get(stat_id, 0)
+	var auto_allocated = auto_allocations.get(stat_id, 0)
+	var total_value = current_value + manual_allocated + auto_allocated
+	
+	const MAX_STAT_LEVEL = 10
+	if total_value >= MAX_STAT_LEVEL:
+		return  # Stat is already at max
 	
 	# Allocate a point
 	points_remaining -= 1
@@ -635,10 +941,17 @@ func _on_plus_button_pressed(stat_id: String, column_index: int) -> void:
 	_update_stat_column(column_index)
 	_update_points_display()
 	
-	print("Allocated point to ", stat_id, " (", points_remaining, " remaining)")
 
 func _on_minus_button_pressed(stat_id: String, column_index: int) -> void:
 	"""Called when player clicks a - button."""
+	# If animation or flash is active, skip it first
+	if animation_active:
+		_skip_animation()
+		return
+	if flashing_active:
+		_skip_flash_sequence()
+		return
+	
 	var current_allocation = manual_allocations.get(stat_id, 0)
 	if current_allocation <= 0:
 		return  # Can't remove if nothing allocated
@@ -653,7 +966,6 @@ func _on_minus_button_pressed(stat_id: String, column_index: int) -> void:
 	_update_stat_column(column_index)
 	_update_points_display()
 	
-	print("Removed point from ", stat_id, " (", points_remaining, " remaining)")
 
 func _update_stat_column(column_index: int) -> void:
 	"""Update a stat column's display."""
@@ -710,12 +1022,19 @@ func _update_stat_column(column_index: int) -> void:
 	var plus_button = button_container.get_node("PlusButton")
 	var minus_button = button_container.get_node("MinusButton")
 	
-	# Disable plus button if no points remaining
-	plus_button.disabled = (points_remaining <= 0)
-	
-	# Show/hide minus button based on MANUAL allocation only (not auto-bestowed)
-	minus_button.visible = (manual_allocated > 0)
-	minus_button.disabled = false  # Always enabled if visible
+	# Disable buttons during animation
+	if animation_active or flashing_active:
+		plus_button.disabled = true
+		minus_button.disabled = true
+	else:
+		# Disable plus button if no points remaining OR stat is at max (10)
+		# Note: current_value, manual_allocated, auto_allocated, and total_value are already declared above
+		const MAX_STAT_LEVEL = 10
+		plus_button.disabled = (points_remaining <= 0) or (total_value >= MAX_STAT_LEVEL)
+		
+		# Show/hide minus button based on MANUAL allocation only (not auto-bestowed)
+		minus_button.visible = (manual_allocated > 0)
+		minus_button.disabled = false  # Always enabled if visible
 
 func _update_points_display() -> void:
 	"""Update the points remaining label."""
@@ -732,8 +1051,8 @@ func _on_confirm_pressed() -> void:
 	"""Called when player confirms their allocation."""
 	if points_remaining > 0:
 		# Player hasn't allocated all points - warn them or auto-allocate?
-		print("Warning: ", points_remaining, " points remaining!")
 		# For now, we'll allow confirmation with remaining points
+		pass
 	
 	# Update all stat columns to ensure visual state is correct
 	for i in range(stat_columns.size()):
@@ -744,8 +1063,11 @@ func _on_confirm_pressed() -> void:
 	var manual_tictacs_to_animate = _collect_manual_allocation_tictacs()
 	
 	# Emit signal with auto stats and manual allocations immediately
+	# Combine base and bonus stats
+	var all_auto_stats = base_auto_stats.duplicate()
+	all_auto_stats.append_array(bonus_auto_stats)
 	var auto_stat_ids: Array[String] = []
-	for index in final_auto_stats:
+	for index in all_auto_stats:
 		auto_stat_ids.append(stats[index].id)
 	
 	stats_confirmed.emit(auto_stat_ids, manual_allocations)
@@ -763,14 +1085,12 @@ func _on_confirm_pressed() -> void:
 		confirm_button.pressed.disconnect(_on_confirm_pressed)
 	confirm_button.pressed.connect(_on_go_pressed)
 	
-	print("Stats confirmed! Click GO! when ready to continue.")
 
 func _on_go_pressed() -> void:
 	"""Called when player clicks GO! to return to game."""
 	# Hide and unpause
 	hide()
 	get_tree().paused = false
-	print("Stat selection complete - game unpaused")
 
 func _collect_manual_allocation_tictacs() -> Array:
 	"""Collect manual allocation tic-tacs BEFORE signal is emitted."""
@@ -871,3 +1191,88 @@ func _animate_collected_tictacs(all_manual_tictacs: Array) -> void:
 	# Wait for the final animation to complete fully
 	# Animation duration is 0.65s, add extra buffer to ensure it's fully visible
 	await get_tree().create_timer(animation_duration + 0.5).timeout
+
+func _create_menu_buttons() -> void:
+	"""Create wordless icon buttons on the stats screen."""
+	# Create container for menu buttons (positioned in top right corner)
+	menu_button_container = HBoxContainer.new()
+	menu_button_container.name = "MenuButtonContainer"
+	menu_button_container.add_theme_constant_override("separation", 10)
+	menu_button_container.alignment = BoxContainer.ALIGNMENT_END
+	
+	# Position in top right corner of the panel
+	menu_button_container.anchors_preset = Control.PRESET_TOP_RIGHT
+	menu_button_container.anchor_left = 1.0
+	menu_button_container.anchor_top = 0.0
+	menu_button_container.anchor_right = 1.0
+	menu_button_container.anchor_bottom = 0.0
+	menu_button_container.offset_left = -280.0  # Width of 4 buttons + spacing
+	menu_button_container.offset_top = 10.0
+	menu_button_container.offset_right = -10.0
+	menu_button_container.offset_bottom = 70.0  # Height of buttons
+	menu_button_container.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	menu_button_container.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	
+	panel.add_child(menu_button_container)
+	menu_button_container.visible = false  # Hidden by default, shown in display mode
+	
+	# Create Resume button (red X)
+	resume_button = Button.new()
+	resume_button.name = "ResumeButton"
+	resume_button.custom_minimum_size = Vector2(60, 60)
+	resume_button.text = "✕"
+	resume_button.add_theme_color_override("font_color", Color(1.0, 0.2, 0.2))
+	resume_button.add_theme_font_size_override("font_size", 32)
+	resume_button.pressed.connect(_on_resume_button_pressed)
+	menu_button_container.add_child(resume_button)
+	
+	# Create Controls button (controller)
+	controls_button = Button.new()
+	controls_button.name = "ControlsButton"
+	controls_button.custom_minimum_size = Vector2(60, 60)
+	controls_button.text = "🎮"
+	controls_button.add_theme_font_size_override("font_size", 32)
+	controls_button.pressed.connect(_on_controls_button_pressed)
+	menu_button_container.add_child(controls_button)
+	
+	# Create Settings button (gear)
+	settings_button = Button.new()
+	settings_button.name = "SettingsButton"
+	settings_button.custom_minimum_size = Vector2(60, 60)
+	settings_button.text = "⚙"
+	settings_button.add_theme_font_size_override("font_size", 32)
+	settings_button.pressed.connect(_on_settings_button_pressed)
+	menu_button_container.add_child(settings_button)
+	
+	# Create Main Menu button (power button)
+	main_menu_button = Button.new()
+	main_menu_button.name = "MainMenuButton"
+	main_menu_button.custom_minimum_size = Vector2(60, 60)
+	main_menu_button.text = "⏻"
+	main_menu_button.add_theme_font_size_override("font_size", 32)
+	main_menu_button.pressed.connect(_on_main_menu_button_pressed)
+	menu_button_container.add_child(main_menu_button)
+
+func setup_pause_menu(pause_menu: Node) -> void:
+	"""Set reference to pause menu for callbacks."""
+	pause_menu_ref = pause_menu
+
+func _on_resume_button_pressed() -> void:
+	"""Resume game."""
+	if pause_menu_ref:
+		pause_menu_ref.resume_game()
+
+func _on_controls_button_pressed() -> void:
+	"""Show controls."""
+	if pause_menu_ref:
+		pause_menu_ref._on_controls_button_pressed()
+
+func _on_settings_button_pressed() -> void:
+	"""Show settings."""
+	if pause_menu_ref:
+		pause_menu_ref._on_settings_button_pressed()
+
+func _on_main_menu_button_pressed() -> void:
+	"""Return to main menu."""
+	if pause_menu_ref:
+		pause_menu_ref._on_main_menu_button_pressed()

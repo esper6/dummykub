@@ -61,13 +61,18 @@ func _on_vsync_toggled(button_pressed: bool) -> void:
 
 func _on_back_button_pressed() -> void:
 	visible = false
-	# Show the main menu again (hide controls)
+	# Show the stats screen again (hide controls and menu)
 	var pause_panel = get_parent()  # This is PausePanel
 	if pause_panel:
-		pause_panel.get_node("MenuContainer").visible = true
+		pause_panel.get_node("MenuContainer").visible = false
 		pause_panel.get_node("ControlsPanel").visible = false
-		# Update the parent PauseMenu's settings_open flag
+		pause_panel.visible = false  # StatUpScreen has its own overlay
+		# Update the parent PauseMenu's settings_open flag and show stats
 		var pause_menu = pause_panel.get_parent()
 		if pause_menu and pause_menu.has_method("enable_pausing"):
 			pause_menu.settings_open = false
-
+			# Show stats screen if available
+			# Access properties directly since they're public variables
+			if pause_menu.stat_up_screen and pause_menu.player:
+				pause_menu.stat_up_screen.show_stats_display(pause_menu.player)
+				pause_menu.stats_open = true

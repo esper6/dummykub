@@ -61,7 +61,6 @@ func show_relic_selection() -> void:
 	# Show and pause
 	show()
 	get_tree().paused = true
-	print("Relic selection screen shown - game paused")
 
 func _create_relic_button(relic: Dictionary) -> Control:
 	"""Create a styled button container for a relic choice."""
@@ -130,7 +129,6 @@ func _create_relic_button(relic: Dictionary) -> Control:
 
 func _on_relic_selected(relic_id: String) -> void:
 	"""Called when player selects a relic."""
-	print("Player selected relic: ", relic_id)
 	
 	# Emit signal
 	relic_chosen.emit(relic_id)
@@ -138,5 +136,4 @@ func _on_relic_selected(relic_id: String) -> void:
 	# Hide and unpause
 	hide()
 	get_tree().paused = false
-	print("Relic selection screen hidden - game unpaused")
 

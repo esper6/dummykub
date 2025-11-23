@@ -64,7 +64,6 @@ func take_damage(damage: int, hit_from_position: Vector2 = Vector2.ZERO, hit_ani
 	
 	# Reduce health
 	current_health -= damage
-	print("Dummy HP: ", current_health, "/", MAX_HEALTH)
 	
 	# Update health bar
 	if health_bar:
@@ -186,7 +185,6 @@ func _on_hitstop_timer_timeout() -> void:
 func _die(damage_type: String) -> void:
 	"""Handle dummy death with different animations based on damage type."""
 	is_dead = true
-	print("Dummy died from: ", damage_type)
 	
 	# Notify companions that dummy died (so they can immediately find new target)
 	EventBus.dummy_died.emit(self)
@@ -243,7 +241,6 @@ func _grant_exp_to_player() -> void:
 
 func _play_death_animation_physical() -> void:
 	"""Death animation for physical attacks (punch, kick, uppercut)."""
-	print("Playing physical death animation")
 	
 	# Check if death animation exists in sprite frames
 	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_physical"):
@@ -264,7 +261,6 @@ func _play_death_animation_physical() -> void:
 
 func _play_death_animation_fire() -> void:
 	"""Death animation for fire attacks."""
-	print("Playing fire death animation")
 	
 	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_fire"):
 		dummy_sprite.play("death_fire")
@@ -288,7 +284,6 @@ func _play_death_animation_fire() -> void:
 
 func _play_death_animation_ice() -> void:
 	"""Death animation for ice attacks."""
-	print("Playing ice death animation")
 	
 	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_ice"):
 		dummy_sprite.play("death_ice")
@@ -317,7 +312,6 @@ func _play_death_animation_ice() -> void:
 
 func _play_death_animation_lightning() -> void:
 	"""Death animation for lightning attacks - dramatic electrocution with buildup."""
-	print("Playing lightning death animation")
 	
 	if dummy_sprite and dummy_sprite.sprite_frames and dummy_sprite.sprite_frames.has_animation("death_lightning"):
 		dummy_sprite.play("death_lightning")
@@ -363,6 +357,5 @@ func _play_death_animation_lightning() -> void:
 
 func _on_death_animation_finished() -> void:
 	"""Called when death animation completes."""
-	print("Death animation finished - dummy removed")
 	# TODO: Could spawn a new dummy here or trigger game over/next wave
 	queue_free()

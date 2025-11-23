@@ -94,11 +94,14 @@ func _ready() -> void:
 	if stat_up_screen:
 		stat_up_screen.stats_confirmed.connect(_on_stats_confirmed)
 	
+	# Set up pause menu with stat screen reference
+	if pause_menu and stat_up_screen:
+		pause_menu.setup_stat_screen(stat_up_screen, player)
+	
 	# Track the initial dummy
 	if dummy:
 		active_dummies.append(dummy)
 		dummy.tree_exited.connect(_on_dummy_died.bind(dummy))
-		print("Initial dummy tracked. Active dummies: ", active_dummies.size())
 	
 	# Spawn dummies at all valid spawn locations at the start
 	_spawn_initial_dummies()
@@ -202,7 +205,7 @@ func _start_game() -> void:
 		pause_menu.enable_pausing()
 
 func _spawn_random_powerup() -> void:
-	"""Spawn a random power-up at a random location."""
+	"""Spawn a random power-up at a random location that doesn't have an existing power-up."""
 	# Initialize power-up pool (equal weight for all, double jump removed - now a relic)
 	if powerup_pool.is_empty():
 		powerup_pool = [
@@ -213,7 +216,37 @@ func _spawn_random_powerup() -> void:
 	
 	# If no power-ups available, don't spawn
 	if powerup_pool.is_empty():
-		print("No power-ups available to spawn")
+		return
+	
+	# Find all existing power-ups in the scene
+	var existing_powerups = _get_existing_powerups()
+	
+	# Find a valid spawn location (not too close to existing power-ups)
+	const MIN_DISTANCE = 150.0  # Minimum distance from existing power-ups
+	var spawn_pos: Vector2 = Vector2.ZERO
+	var valid_location_found = false
+	var attempts = 0
+	const MAX_ATTEMPTS = 50  # Try up to 50 times to find a valid location
+	
+	while not valid_location_found and attempts < MAX_ATTEMPTS:
+		# Pick a random spawn location
+		var candidate_pos = powerup_spawn_locations[randi() % powerup_spawn_locations.size()]
+		
+		# Check if this location is far enough from existing power-ups
+		var too_close = false
+		for existing in existing_powerups:
+			if existing.global_position.distance_to(candidate_pos) < MIN_DISTANCE:
+				too_close = true
+				break
+		
+		if not too_close:
+			spawn_pos = candidate_pos
+			valid_location_found = true
+		
+		attempts += 1
+	
+	# If we couldn't find a valid location, skip spawning
+	if not valid_location_found:
 		return
 	
 	# Pick a random power-up from pool
@@ -221,13 +254,9 @@ func _spawn_random_powerup() -> void:
 	var powerup = random_powerup_scene.instantiate()
 	add_child(powerup)
 	
-	# Use random spawn location from the pool
-	var spawn_pos = powerup_spawn_locations[randi() % powerup_spawn_locations.size()]
-	
 	powerup.global_position = spawn_pos
 	powerup.z_index = 10  # Above most things but below UI
 	
-	print("Power-up spawned: ", powerup.name, " at ", spawn_pos)
 	
 	# Spawn animation
 	powerup.modulate.a = 0.0
@@ -238,13 +267,30 @@ func _spawn_random_powerup() -> void:
 	spawn_tween.tween_property(powerup, "modulate:a", 1.0, 0.4)
 	spawn_tween.tween_property(powerup, "scale", Vector2.ONE, 0.4).set_ease(Tween.EASE_OUT)
 
+func _get_existing_powerups() -> Array:
+	"""Get all existing power-up nodes in the scene."""
+	var powerups: Array = []
+	
+	# Power-ups are Area2D nodes - find all Area2D children
+	# All power-ups have a "collected" property, so we can identify them by that
+	for child in get_children():
+		# Check if this is an Area2D (power-ups extend Area2D)
+		if child is Area2D:
+			# Try to get the collected property - if it exists, this is a power-up
+			var collected = child.get("collected")
+			if collected != null:
+				# Only include power-ups that haven't been collected yet
+				if not collected:
+					powerups.append(child)
+	
+	return powerups
+
 func _on_player_exp_gained(_amount: int) -> void:
 	"""Called when player gains EXP."""
 	_update_exp_display()
 
 func _on_player_level_up(new_level: int) -> void:
 	"""Called when player levels up."""
-	print("GameManager: Player leveled up to ", new_level)
 	_update_exp_display()
 	
 	# Show stat up screen at every level starting from level 2
@@ -253,7 +299,6 @@ func _on_player_level_up(new_level: int) -> void:
 
 func _on_skill_chosen(skill_name: String) -> void:
 	"""Called when player chooses a skill from level up screen."""
-	print("GameManager: Player chose skill: ", skill_name)
 	
 	# Unlock the skill for the player
 	if player:
@@ -264,7 +309,6 @@ func _on_skill_chosen(skill_name: String) -> void:
 
 func _on_ability_chosen(ability_id: String) -> void:
 	"""Called when player chooses an ability from ability up screen."""
-	print("GameManager: Player chose ability: ", ability_id)
 	
 	# Apply the ability to the player
 	if player:
@@ -280,7 +324,6 @@ func _on_ability_chosen(ability_id: String) -> void:
 
 func _on_relic_chosen(relic_id: String) -> void:
 	"""Called when player chooses a relic at level 4."""
-	print("GameManager: Player chose relic: ", relic_id)
 	
 	# Apply the relic to the player (permanent upgrades)
 	if player:
@@ -294,20 +337,25 @@ func _on_relic_chosen(relic_id: String) -> void:
 
 func _on_stats_confirmed(auto_stats: Array, manual_allocations: Dictionary) -> void:
 	"""Called when player confirms their stat allocation."""
-	print("GameManager: Stats confirmed - Auto: ", auto_stats, " Manual: ", manual_allocations)
 	
 	if not player:
 		return
 	
-	# Apply auto stats (+1 to each of the 3 random stats)
+	# Apply auto stats (+1 to each of the random stats, capped at 10)
 	for stat_id in auto_stats:
-		player.increase_stat(stat_id, 1)
+		var current_value = player.get_stat_value(stat_id)
+		if current_value < 10:  # Only apply if not already at max
+			player.increase_stat(stat_id, 1)
 	
-	# Apply manual allocations (player's 2 points)
+	# Apply manual allocations (player's 2 points, capped at 10)
 	for stat_id in manual_allocations:
-		player.increase_stat(stat_id, manual_allocations[stat_id])
+		var current_value = player.get_stat_value(stat_id)
+		var allocation_amount = manual_allocations[stat_id]
+		# Only apply up to the cap
+		var amount_to_apply = min(allocation_amount, 10 - current_value)
+		if amount_to_apply > 0:
+			player.increase_stat(stat_id, amount_to_apply)
 	
-	print("All stats applied to player")
 
 func _update_exp_display() -> void:
 	"""Update the EXP bar and labels."""
@@ -377,17 +425,41 @@ func _spawn_initial_dummies() -> void:
 			spawn_tween.tween_property(new_dummy, "modulate:a", 1.0, 0.5)
 			spawn_tween.tween_property(new_dummy, "scale", Vector2.ONE, 0.5).set_ease(Tween.EASE_OUT)
 			
-			print("Spawned initial dummy at ", spawn_pos)
 	
-	print("Initial dummies spawned. Total active dummies: ", active_dummies.size())
 
 func _spawn_new_dummy() -> void:
-	"""Spawn a new dummy at a random spawn location."""
+	"""Spawn a new dummy at a random spawn location that doesn't already have a dummy."""
+	const MIN_DISTANCE_FROM_EXISTING = 100.0  # Minimum distance from existing dummies
+	
+	# Try to find an available spawn location
+	var available_locations: Array[Vector2] = []
+	
+	# Check each spawn location to see if it's clear
+	for spawn_pos in dummy_spawn_locations:
+		var is_clear = true
+		# Check distance to all active dummies
+		for existing_dummy in active_dummies:
+			if not is_instance_valid(existing_dummy):
+				continue
+			var distance = spawn_pos.distance_to(existing_dummy.global_position)
+			if distance < MIN_DISTANCE_FROM_EXISTING:
+				is_clear = false
+				break
+		
+		if is_clear:
+			available_locations.append(spawn_pos)
+	
+	# If no locations are available, don't spawn
+	if available_locations.is_empty():
+		# Reset timer anyway so we can try again later
+		time_since_last_dummy_spawn = 0.0
+		return
+	
+	# Pick a random available location
+	var spawn_pos = available_locations[randi() % available_locations.size()]
+	
 	var new_dummy = Dummy.instantiate()
 	add_child(new_dummy)
-	
-	# Get random spawn position
-	var spawn_pos = dummy_spawn_locations[randi() % dummy_spawn_locations.size()]
 	
 	new_dummy.global_position = spawn_pos
 	new_dummy.z_index = 1
@@ -398,8 +470,6 @@ func _spawn_new_dummy() -> void:
 	
 	# Reset spawn timer
 	time_since_last_dummy_spawn = 0.0
-	
-	print("Spawned new dummy at ", spawn_pos, " | Active dummies: ", active_dummies.size())
 	
 	# Spawn animation - fade in
 	new_dummy.modulate.a = 0.0
@@ -414,4 +484,3 @@ func _on_dummy_died(dummy_reference) -> void:
 	"""Called when a dummy is destroyed."""
 	if dummy_reference in active_dummies:
 		active_dummies.erase(dummy_reference)
-		print("Dummy died | Remaining: ", active_dummies.size())

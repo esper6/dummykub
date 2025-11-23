@@ -108,7 +108,6 @@ func setup(direction: Vector2, projectile_damage: int = 50) -> void:
 	damage_per_tick = int(float(damage) / float(TOTAL_TICKS))
 	# Ensure at least 1 damage per tick (safety check)
 	damage_per_tick = max(1, damage_per_tick)
-	print("Thunderbolt setup: total_damage=%d, damage_per_tick=%d (over %d ticks)" % [damage, damage_per_tick, TOTAL_TICKS])
 
 func _physics_process(delta: float) -> void:
 	"""Override: Stop movement when attached to target."""

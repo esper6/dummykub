@@ -54,7 +54,6 @@ func _ready() -> void:
 	EventBus.dummy_spawned.connect(_on_dummy_spawned)
 	EventBus.dummy_died.connect(_on_dummy_died)
 	
-	print("🐕 Companion ready! Waiting for targets...")
 
 func _physics_process(delta: float) -> void:
 	# Apply gravity
@@ -92,12 +91,10 @@ func _validate_and_update_target() -> void:
 	# Step 1: Validate current target is still alive
 	if current_target != null:
 		if not is_instance_valid(current_target):
-			print("❌ Target invalid, clearing")
 			current_target = null
 		else:
 			var is_dead = current_target.get("is_dead")
 			if is_dead != null and is_dead:
-				print("💀 Target died, clearing")
 				current_target = null
 	
 	# Step 2: Find the nearest living dummy
@@ -109,7 +106,6 @@ func _validate_and_update_target() -> void:
 		
 		if current_target != null:
 			var dist = global_position.distance_to(current_target.global_position)
-			print("🎯 TARGET SWITCH | New: ", current_target, " | Distance: %.1f" % dist)
 			
 			# CRITICAL: Reset per-target cooldown when switching targets
 			# This allows IMMEDIATE attack on new targets!
@@ -120,9 +116,8 @@ func _validate_and_update_target() -> void:
 			
 			# If we're already in range of new target, we can attack immediately
 			if dist <= ATTACK_RANGE:
-				print("   ↳ Already in range! Can attack IMMEDIATELY (new target)")
+				pass
 		else:
-			print("❌ No valid targets available")
 			time_with_current_target = 0.0
 			time_since_attacked_current_target = 999.0
 			time_stuck = 0.0
@@ -165,14 +160,12 @@ func _pursue_and_attack(delta: float) -> void:
 		return
 	
 	if not is_instance_valid(current_target):
-		print("⚠️ Target became invalid during pursuit")
 		current_target = null
 		return
 	
 	# Check if target is dead
 	var is_dead = current_target.get("is_dead")
 	if is_dead != null and is_dead:
-		print("⚠️ Target died during pursuit")
 		current_target = null
 		return
 	
@@ -222,27 +215,22 @@ func _pursue_and_attack(delta: float) -> void:
 				attack_reason = "FORCE (target held %.2fs)" % time_with_current_target
 			
 			if attack_reason != "normal":
-				print("🚨 %s ATTACK TRIGGERED!" % attack_reason)
+				pass
 			
 			# Final validation before attack
 			if current_target != null and is_instance_valid(current_target):
 				_perform_attack()
 			else:
-				print("⚠️ Target became invalid right before attack")
 				current_target = null
 		else:
 			# On cooldown - but log if this persists
 			var cooldown_remaining = ATTACK_COOLDOWN - time_since_attacked_current_target
 			if time_with_current_target > 0.2:  # Only warn if we've had target for a bit
-				print("⏱️ In range (%.1f) waiting | Target cooldown: %.2fs | Time with target: %.2fs" % [distance, cooldown_remaining, time_with_current_target])
+				pass
 			
 			# CRITICAL WARNING if we've been stuck here too long (should be impossible now)
 			if time_with_current_target > 0.2:  # Much shorter threshold now
-				print("🔴 CRITICAL: Been in range for %.2fs without attacking! This should NEVER happen!" % time_with_current_target)
-				print("   Debug: is_new=%s, can_attack=%s, force=%s, desperation=%s, emergency=%s, stuck=%s" % [is_new_target, can_attack_this_target, force_attack, desperation_attack, emergency_melee, stuck_attack])
-				print("   Timers: since_any_attack=%.2f, since_attacked_this=%.2f, with_target=%.2f, time_stuck=%.2f" % [time_since_last_attack, time_since_attacked_current_target, time_with_current_target, time_stuck])
-				print("   Distance: current=%.1f, last=%.1f, change=%.1f" % [distance, last_distance_to_target, distance_change])
-				print("   Targets: current=%s, last_attacked=%s" % [current_target, last_attacked_target])
+				pass
 		
 		# Slow down when in attack range
 		var slow_speed = _get_move_speed()
@@ -252,8 +240,6 @@ func _pursue_and_attack(delta: float) -> void:
 	# Not in range yet - move toward target
 	# Only log movement occasionally (every 1 second) to avoid spam
 	if last_log_time >= 1.0:
-		var stuck_status = " | STUCK %.2fs!" % time_stuck if time_stuck > 0.3 else ""
-		print("🏃 Moving to target | Distance: %.1f | Time since attack: %.2fs%s" % [distance, time_since_last_attack, stuck_status])
 		last_log_time = 0.0
 	
 	var direction = (current_target.global_position - global_position).normalized()
@@ -272,31 +258,26 @@ func _perform_attack() -> void:
 	"""Execute an attack on the current target. ALWAYS SUCCEEDS if called."""
 	# First null check - before ANY method calls
 	if current_target == null:
-		print("⚠️ Attack failed: target is null")
 		return
 	
 	# Validity check
 	if not is_instance_valid(current_target):
-		print("⚠️ Attack failed: target not valid")
 		current_target = null
 		return
 	
 	# Check if dummy has take_damage method
 	if not current_target.has_method("take_damage"):
-		print("⚠️ Attack failed: no take_damage method")
 		current_target = null
 		return
 	
 	# Final alive check
 	var is_dead = current_target.get("is_dead")
 	if is_dead != null and is_dead:
-		print("⚠️ Attack failed: target already dead")
 		current_target = null
 		return
 	
 	# ATTACK! (Re-validate one more time before the actual attack)
 	if current_target == null or not is_instance_valid(current_target):
-		print("⚠️ Attack failed: target became invalid during checks")
 		return
 	
 	# Calculate damage with player multipliers
@@ -316,7 +297,6 @@ func _perform_attack() -> void:
 	var target_health = current_target.get("current_health") if current_target else "?"
 	var was_new = (current_target != last_attacked_target)
 	var crit_text = " 💥CRIT!💥" if is_crit else ""
-	print("⚔️⚔️⚔️ ATTACKED! | Damage: ", actual_damage, crit_text, " | Distance: %.1f" % distance, " | HP: ", target_health, " | New: ", was_new)
 	
 	# Update timers
 	time_since_last_attack = 0.0  # Reset global attack timer
@@ -340,7 +320,6 @@ func _wander(delta: float) -> void:
 		if abs(velocity.x) < 10.0:
 			if randf() < 0.1:  # 10% chance per frame when stopped
 				velocity.x = randf_range(-move_speed * 0.6, move_speed * 0.6)
-				print("🚶 Wandering ", "left" if velocity.x < 0 else "right")
 		else:
 			# Already moving, occasionally change direction
 			if randf() < 0.01:  # 1% chance per frame
@@ -358,22 +337,18 @@ func _wander(delta: float) -> void:
 
 func _on_dummy_spawned(dummy: Node2D) -> void:
 	"""Called when a new dummy spawns - immediately check if we should target it."""
-	print("📢 Dummy spawned signal received!")
 	# Validation will happen next frame automatically, but force a check now
 	_validate_and_update_target()
 	
 	# If we just got this new dummy as target, we can attack immediately
 	if current_target == dummy:
-		var dist = global_position.distance_to(dummy.global_position)
-		print("   ↳ New dummy targeted! Distance: %.1f | Can attack: %s" % [dist, dist <= ATTACK_RANGE])
+		pass
 
 func _on_dummy_died(dummy: Node2D) -> void:
 	"""Called when a dummy dies - immediately find new target."""
-	print("📢 Dummy died signal received!")
 	
 	# If this was our target, clear it
 	if current_target == dummy:
-		print("   ↳ Was our target, clearing and finding new one...")
 		current_target = null
 		time_with_current_target = 0.0
 		# Immediately find new target - per-target timer will reset when we switch
